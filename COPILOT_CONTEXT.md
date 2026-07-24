@@ -493,6 +493,11 @@ cd /opt/solar-monitor
 `android/build/emulator-artifacts/`. Subcomenzi disponibile: `doctor`, `start`, `wait`, `build`, `install`,
 `launch`, `screenshot`, `status`, `verify`, `stop`.
 
+Emulatorul se păstrează pornit numai în timpul dezvoltării sau verificării active. La finalul fiecărei
+sarcini care îl folosește se rulează obligatoriu `stop`, apoi se verifică serviciul `inactive/dead`, absența
+procesului `qemu-system-x86` și lista ADB goală. Excepție numai dacă utilizatorul cere explicit să rămână
+pornit.
+
 Verificare reală efectuată pe Android 14 pentru aplicația **2.0**: dashboardul Retro s-a randat cu date live,
 selectorul Retro/Simple a funcționat, tema Simple s-a păstrat după force-stop/restart, apoi preferința a fost
 readusă la Retro. Captura stabilă este `android/build/emulator-artifacts/retro-verified.png`. Nu s-a modificat
@@ -954,3 +959,16 @@ collectorul, API-ul sau regula READ-ONLY.
   `versionCode + 1` și `versionName + 0.01`; nicio versiune/nume livrat anterior nu se reutilizează.
 - Modificările sunt Android, documentație și verificarea transportului Telegram. API-ul și containerele
   serverului nu necesită rebuild; accesul la invertor rămâne strict READ-ONLY.
+
+### 13.46 Politică resurse emulator Android (2026-07-25)
+
+- Procesul `qemu-system-x86_64-headless` identificat era AVD-ul nostru `SolarMonitor_API_34`, nu un serviciu
+  de producție. Rula de aproximativ 46 de ore și ajunsese la circa 266% CPU cumulat și 4,9 GB RAM.
+- Emulatorul a fost oprit prin helperul versionat. Verificare finală: serviciul
+  `solar-monitor-emulator.service` este `inactive/dead`, `MainPID=0`, procesul QEMU lipsește și ADB nu
+  listează niciun dispozitiv.
+- Emulatorul nu este necesar pentru collector, InfluxDB, API, Grafana sau aplicația instalată pe telefon.
+  Helperul îl pornește la nevoie pentru dezvoltare, capturi și verificări APK.
+- Regula permanentă este salvată atât în skill-ul proiectului, cât și în copia globală: la finalul oricărei
+  sarcini emulator/release se rulează obligatoriu `stop` și se verifică eliberarea resurselor, exceptând
+  numai cererea explicită de a-l lăsa pornit.

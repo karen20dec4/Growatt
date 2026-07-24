@@ -26,7 +26,8 @@ Artifacts go to the gitignored `android/build/emulator-artifacts/` directory.
 - Package/activity: `com.rolling7.solar/.MainActivity`
 - Acceleration: `/dev/kvm`
 - Headless renderer: `swangle` (stable with Emulator 36.6.11 on this host)
-- Process lifetime: transient `solar-monitor-emulator.service` created by `systemd-run`
+- Process lifetime: transient `solar-monitor-emulator.service` created by `systemd-run`; keep it alive only
+  during active development or verification
 
 Use `ANDROID_SDK_ROOT` or `ANDROID_HOME` to override the SDK and `SOLAR_AVD_NAME` to override the AVD.
 Use `SOLAR_EMULATOR_GPU` only for diagnosis; the verified default is `swangle`. Do not switch back to
@@ -59,7 +60,11 @@ Pass a PNG path as the second argument to `screenshot` or `verify` when a stable
    confirm `shared_prefs/solar_dashboard_style.xml` through `adb shell run-as com.rolling7.solar`.
 5. Inspect logcat for `AndroidRuntime`, `FATAL EXCEPTION`, layout symptoms, or networking failures when the
    screenshot does not show live data.
-6. Leave the emulator running while iterating; use `stop` when work is finished or resources are needed.
+6. Leave the emulator running only while actively iterating. At the end of every emulator/release task,
+   always run `stop` and verify that `solar-monitor-emulator.service` is inactive, no `qemu-system-x86`
+   process remains, and ADB lists no emulator. Keep it running after the task only when the user explicitly
+   asks. Never leave the AVD idle between sessions: on this host it can consume multiple CPU cores and
+   roughly 5 GB RAM.
 
 For the fixed Retro layout, run `retro-tabs` after any Compose or Photoshop-asset change. It taps all four
 navigation regions on the pinned Pixel 6 AVD, saves `retro-tab-{tablou,energie,sistem,setari}.png`, confirms
