@@ -1024,3 +1024,34 @@ collectorul, API-ul sau regula READ-ONLY.
   descărcat înapoi din Telegram are același SHA-256.
 - Release-ul modifică numai aplicația Android. API-ul și containerele serverului nu necesită rebuild;
   accesul la invertor rămâne strict READ-ONLY.
+
+### 13.49 Release Android v3.09 — comutatoare Retro animate (2026-07-28)
+
+- Cardul ALARMĂ pornește din exportul cu șine goale
+  `SETARI-card-alarma-optimized-v3.png`. Etichetele de scală eronate din acel export (`5080`, `7300`,
+  `30u`) au fost înlocuite cu etichetele corecte din V2, păstrând textura fotografică și șinele goale.
+- `knob.png` este folosit pentru cursoarele native Prag și Cooldown. Poziția lui urmărește valorile
+  dinamice salvate, iar valorile `W` și `s` sunt randate de Compose.
+- `toggle-off.png` și `toggle-on.png` au fost separate în trei resurse lossless: șină, buton metalic și
+  lumină. Pentru Alarmă și Vibrație, butonul se deplasează fizic stânga/dreapta în 260 ms, iar lumina
+  verde se aprinde și se stinge progresiv. Nu este o simplă schimbare statică de bitmap.
+- Starea textuală `OPRITĂ` / `ACTIVĂ` este dinamică și nu mai este lipită peste textul din imagine.
+  Activarea alarmei și vibrația persistă după oprirea și relansarea aplicației.
+- **versionCode 22 / versionName 3.09**; APK semnat:
+  `/opt/solar-monitor/SolarMonitor-v3.09.apk`.
+- Dimensiune: **7.071.252 bytes**; SHA-256:
+  `822ce12ae5944a98cc69ef9b295c7860edf8b3cd3ad925b7466fba10c70d2b7a`.
+- `aapt` confirmă pachetul `com.rolling7.solar`, target/compile SDK 34 și versiunea 3.09 (22).
+  `apksigner` confirmă APK Signature Scheme v2 și certificatul permanent Borealis Media, SHA-256
+  `b892e453841228510aa4c08f9a164652baa0005638279cc18572dde677d293f6`.
+- Upgrade real verificat pe emulator Android 14: instalare release semnat 3.08, apoi `adb install -r`
+  pentru 3.09. Cele patru taburi sunt fixe, fără crash și fără container scrollabil. Comutatoarele au
+  fost apăsate, verificate în timpul cursei și reverificate după relansare.
+- Au trecut 20 teste unitare Android, `lintDebug`, `assembleDebug`, R8 și `assembleRelease`.
+  Captura semnată este
+  `android/build/emulator-artifacts/release-v3.09-setari-signed-1080x2400.png`.
+- Livrare Telegram confirmată prin `@sun_tattva_access_bot`: mesaj ID **63**, nume
+  `SolarMonitor-v3.09.apk`, dimensiune 7.071.252 bytes, `file_unique_id` **AgADzx8AAhugQVM**;
+  SHA-256 raportat de transport este identic.
+- Release-ul modifică numai aplicația Android și rămâne strict READ-ONLY. API-ul și containerele
+  serverului nu necesită rebuild.
