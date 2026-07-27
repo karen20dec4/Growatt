@@ -2,6 +2,12 @@ package com.rolling7.solar
 
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -12,6 +18,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,6 +37,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -51,6 +62,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
@@ -70,6 +83,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -137,6 +151,20 @@ internal enum class RetroTab(val label: String) {
     ENERGY("ENERGIE"),
     SYSTEM("SISTEM"),
     SETTINGS("SETARI")
+}
+
+internal fun retroTabAfterSwipe(
+    current: RetroTab,
+    horizontalDistance: Float,
+    verticalDistance: Float,
+    threshold: Float
+): RetroTab {
+    val horizontal = abs(horizontalDistance)
+    val vertical = abs(verticalDistance)
+    if (horizontal < threshold || horizontal <= vertical * 1.25f) return current
+
+    val nextIndex = current.ordinal + if (horizontalDistance < 0f) 1 else -1
+    return RetroTab.entries.getOrNull(nextIndex) ?: current
 }
 
 internal enum class RetroSystemSlot(val historyField: String?) {
@@ -237,25 +265,94 @@ internal fun RetroDashboard(
             contentScale = ContentScale.FillBounds
         )
         Column(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f)) {
-                when (selectedTab) {
-                    RetroTab.DASHBOARD -> RetroOverviewPage(
-                        data = data,
-                        alarmThresholdW = alarmThresholdW,
-                        onEnergyFieldClick = onEnergyFieldClick
+            val swipeThreshold = with(LocalDensity.current) { 72.dp.toPx() }
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clipToBounds()
+                    .retroSwipeNavigation(
+                        selectedTab = selectedTab,
+                        threshold = swipeThreshold,
+                        onTabSelected = onTabSelected
                     )
-                    RetroTab.ENERGY -> energyContent()
-                    RetroTab.SYSTEM -> RetroSystemPage(
-                        data = data,
-                        onEnergyFieldClick = onEnergyFieldClick
-                    )
-                    RetroTab.SETTINGS -> settingsContent()
+            ) {
+                AnimatedContent(
+                    targetState = selectedTab,
+                    transitionSpec = {
+                        val forward = targetState.ordinal > initialState.ordinal
+                        val enterOffset: (Int) -> Int = { width -> if (forward) width else -width }
+                        val exitOffset: (Int) -> Int = { width -> if (forward) -width else width }
+                        (
+                            slideInHorizontally(
+                                animationSpec = tween(durationMillis = 240),
+                                initialOffsetX = enterOffset
+                            ) + fadeIn(animationSpec = tween(durationMillis = 180))
+                        ).togetherWith(
+                            slideOutHorizontally(
+                                animationSpec = tween(durationMillis = 240),
+                                targetOffsetX = exitOffset
+                            ) + fadeOut(animationSpec = tween(durationMillis = 180))
+                        )
+                    },
+                    label = "Navigare pagini Retro",
+                    modifier = Modifier.fillMaxSize()
+                ) { visibleTab ->
+                    when (visibleTab) {
+                        RetroTab.DASHBOARD -> RetroOverviewPage(
+                            data = data,
+                            alarmThresholdW = alarmThresholdW,
+                            onEnergyFieldClick = onEnergyFieldClick
+                        )
+                        RetroTab.ENERGY -> energyContent()
+                        RetroTab.SYSTEM -> RetroSystemPage(
+                            data = data,
+                            onEnergyFieldClick = onEnergyFieldClick
+                        )
+                        RetroTab.SETTINGS -> settingsContent()
+                    }
                 }
             }
             RetroBottomNavigation(
                 selectedTab = selectedTab,
                 onTabSelected = onTabSelected
             )
+        }
+    }
+}
+
+private fun Modifier.retroSwipeNavigation(
+    selectedTab: RetroTab,
+    threshold: Float,
+    onTabSelected: (RetroTab) -> Unit
+): Modifier = pointerInput(selectedTab, threshold) {
+    awaitEachGesture {
+        val down = awaitFirstDown(
+            requireUnconsumed = false,
+            pass = PointerEventPass.Final
+        )
+        var horizontalDistance = 0f
+        var verticalDistance = 0f
+        var claimedByControl = down.isConsumed
+        var pressed = true
+
+        while (pressed) {
+            val event = awaitPointerEvent(pass = PointerEventPass.Final)
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            horizontalDistance += change.position.x - change.previousPosition.x
+            verticalDistance += change.position.y - change.previousPosition.y
+            claimedByControl = claimedByControl || change.isConsumed
+            pressed = change.pressed
+        }
+
+        if (!claimedByControl) {
+            val destination = retroTabAfterSwipe(
+                current = selectedTab,
+                horizontalDistance = horizontalDistance,
+                verticalDistance = verticalDistance,
+                threshold = threshold
+            )
+            if (destination != selectedTab) onTabSelected(destination)
         }
     }
 }
@@ -1342,6 +1439,473 @@ private fun RetroSystemConsole(
 
 private fun retroSystemPercentText(value: Double?): String =
     value?.let { "${it.roundToInt()}%" } ?: "—"
+
+@Composable
+internal fun RetroSettingsArtworkPage(
+    dashboardStyle: DashboardStyle,
+    settings: AlarmSettings,
+    ringtoneTitle: String,
+    onDashboardStyleChange: (DashboardStyle) -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
+    onThresholdChange: (Int) -> Unit,
+    onCooldownChange: (Int) -> Unit,
+    onVibrateChange: (Boolean) -> Unit,
+    onPickRingtone: () -> Unit,
+    onTestAlarm: () -> Unit
+) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = 7.dp, top = 18.dp, end = 7.dp, bottom = 5.dp)
+    ) {
+        val density = LocalDensity.current
+        val topOffset = with(density) { 40.toDp() }
+        val topToThemeGap = with(density) { 12.toDp() }
+        val themeToAlarmGap = with(density) { 20.toDp() }
+        val heightPerWidth =
+            (361f / 1_380f) +
+                (408f / 1_119f) +
+                (1_077f / 960f)
+        val naturalWidth = maxWidth * 0.95f
+        val availableHeight =
+            (maxHeight - topOffset - topToThemeGap - themeToAlarmGap).coerceAtLeast(1.dp)
+        val widthLimitedByHeight = availableHeight / heightPerWidth
+        val cardWidth = if (naturalWidth <= widthLimitedByHeight) {
+            naturalWidth
+        } else {
+            widthLimitedByHeight
+        }
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset { IntOffset(x = 0, y = 40) },
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            RetroSettingsTopArtwork(
+                modifier = Modifier
+                    .width(cardWidth)
+                    .aspectRatio(1_380f / 361f)
+            )
+            Spacer(Modifier.height(topToThemeGap))
+            RetroSettingsThemeArtwork(
+                dashboardStyle = dashboardStyle,
+                onDashboardStyleChange = onDashboardStyleChange,
+                modifier = Modifier
+                    .width(cardWidth)
+                    .aspectRatio(1_119f / 408f)
+            )
+            Spacer(Modifier.height(themeToAlarmGap))
+            RetroSettingsAlarmArtwork(
+                settings = settings,
+                ringtoneTitle = ringtoneTitle,
+                onEnabledChange = onEnabledChange,
+                onThresholdChange = onThresholdChange,
+                onCooldownChange = onCooldownChange,
+                onVibrateChange = onVibrateChange,
+                onPickRingtone = onPickRingtone,
+                onTestAlarm = onTestAlarm,
+                modifier = Modifier
+                    .width(cardWidth)
+                    .aspectRatio(960f / 1_077f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RetroSettingsTopArtwork(modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(R.drawable.retro_settings_top_artwork),
+        contentDescription = "Setari. Tema, alarma si sunet",
+        modifier = modifier,
+        contentScale = ContentScale.FillBounds
+    )
+}
+
+@Composable
+private fun RetroSettingsThemeArtwork(
+    dashboardStyle: DashboardStyle,
+    onDashboardStyleChange: (DashboardStyle) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(modifier) {
+        val scaleX = maxWidth / 1_119f
+        val scaleY = maxHeight / 408f
+        Image(
+            painter = painterResource(R.drawable.retro_settings_theme_artwork),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.FillBounds
+        )
+        RetroEnergyTouchTarget(
+            description = "Tema Retro",
+            selected = dashboardStyle == DashboardStyle.RETRO,
+            accent = RetroSage,
+            modifier = Modifier
+                .offset(x = scaleX * 75f, y = scaleY * 158f)
+                .width(scaleX * 470f)
+                .height(scaleY * 174f),
+            onClick = { onDashboardStyleChange(DashboardStyle.RETRO) }
+        )
+        RetroEnergyTouchTarget(
+            description = "Tema Simple",
+            selected = dashboardStyle == DashboardStyle.SIMPLE,
+            accent = RetroHouseBlue,
+            modifier = Modifier
+                .offset(x = scaleX * 575f, y = scaleY * 158f)
+                .width(scaleX * 470f)
+                .height(scaleY * 174f),
+            onClick = { onDashboardStyleChange(DashboardStyle.SIMPLE) }
+        )
+    }
+}
+
+@Composable
+private fun RetroSettingsAlarmArtwork(
+    settings: AlarmSettings,
+    ringtoneTitle: String,
+    onEnabledChange: (Boolean) -> Unit,
+    onThresholdChange: (Int) -> Unit,
+    onCooldownChange: (Int) -> Unit,
+    onVibrateChange: (Boolean) -> Unit,
+    onPickRingtone: () -> Unit,
+    onTestAlarm: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(
+        modifier = modifier.semantics {
+            contentDescription = "Setari alarma consum mare"
+        }
+    ) {
+        val scaleX = maxWidth / 960f
+        val scaleY = maxHeight / 1_077f
+
+        Image(
+            painter = painterResource(R.drawable.retro_settings_alarm_artwork),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.FillBounds
+        )
+
+        RetroSettingsToggleTarget(
+            checked = settings.enabled,
+            description = if (settings.enabled) "Alarma consum mare activa" else "Alarma consum mare oprita",
+            modifier = Modifier
+                .offset(x = scaleX * 710f, y = scaleY * 30f)
+                .width(scaleX * 210f)
+                .height(scaleY * 125f),
+            onClick = { onEnabledChange(!settings.enabled) }
+        )
+        if (settings.enabled) {
+            RetroSettingsStatusText(
+                text = "ACTIVA",
+                modifier = Modifier
+                    .offset(x = scaleX * 132f, y = scaleY * 132f)
+                    .width(scaleX * 190f)
+                    .height(scaleY * 63f)
+            )
+        }
+
+        RetroSettingsSlider(
+            value = settings.thresholdW,
+            defaultValue = 5_000,
+            range = 0f..10_000f,
+            step = 100,
+            description = "Prag alarma ${settings.thresholdW} W",
+            modifier = Modifier
+                .offset(x = scaleX * 155f, y = scaleY * 293f)
+                .width(scaleX * 780f)
+                .height(scaleY * 125f),
+            trackModifier = Modifier
+                .offset(x = scaleX * 184f, y = scaleY * 324f)
+                .width(scaleX * 716f)
+                .height(scaleY * 54f),
+            onValueChange = onThresholdChange
+        )
+        if (settings.thresholdW != 5_000) {
+            RetroSettingsValuePatch(
+                text = "${settings.thresholdW} W",
+                modifier = Modifier
+                    .offset(x = scaleX * 670f, y = scaleY * 244f)
+                    .width(scaleX * 190f)
+                    .height(scaleY * 55f)
+            )
+        }
+
+        RetroSettingsSlider(
+            value = settings.cooldownS,
+            defaultValue = 300,
+            range = 0f..600f,
+            step = 30,
+            description = "Cooldown ${settings.cooldownS} secunde",
+            modifier = Modifier
+                .offset(x = scaleX * 155f, y = scaleY * 510f)
+                .width(scaleX * 780f)
+                .height(scaleY * 125f),
+            trackModifier = Modifier
+                .offset(x = scaleX * 184f, y = scaleY * 542f)
+                .width(scaleX * 716f)
+                .height(scaleY * 52f),
+            onValueChange = onCooldownChange
+        )
+        if (settings.cooldownS != 300) {
+            RetroSettingsValuePatch(
+                text = "${settings.cooldownS} s",
+                modifier = Modifier
+                    .offset(x = scaleX * 690f, y = scaleY * 462f)
+                    .width(scaleX * 180f)
+                    .height(scaleY * 54f),
+                drawBackground = false
+            )
+        }
+
+        RetroSettingsToggleTarget(
+            checked = settings.vibrate,
+            description = if (settings.vibrate) "Vibratie activa" else "Vibratie oprita",
+            dimWhenOff = true,
+            modifier = Modifier
+                .offset(x = scaleX * 705f, y = scaleY * 666f)
+                .width(scaleX * 215f)
+                .height(scaleY * 130f),
+            onClick = { onVibrateChange(!settings.vibrate) }
+        )
+
+        Text(
+            text = ringtoneTitle.uppercase(Locale.getDefault()),
+            color = RetroSage,
+            fontFamily = RetroMono,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.7.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .offset(x = scaleX * 220f, y = scaleY * 890f)
+                .width(scaleX * 360f)
+        )
+        RetroSettingsClickTarget(
+            description = "Alege sunet alarma, $ringtoneTitle",
+            modifier = Modifier
+                .offset(x = scaleX * 178f, y = scaleY * 850f)
+                .width(scaleX * 470f)
+                .height(scaleY * 125f),
+            onClick = onPickRingtone
+        )
+        RetroSettingsClickTarget(
+            description = "Testeaza alarma",
+            modifier = Modifier
+                .offset(x = scaleX * 650f, y = scaleY * 850f)
+                .width(scaleX * 270f)
+                .height(scaleY * 135f),
+            onClick = onTestAlarm
+        )
+    }
+}
+
+@Composable
+private fun RetroSettingsSlider(
+    value: Int,
+    defaultValue: Int,
+    range: ClosedFloatingPointRange<Float>,
+    step: Int,
+    description: String,
+    modifier: Modifier,
+    trackModifier: Modifier,
+    onValueChange: (Int) -> Unit
+) {
+    if (value != defaultValue) {
+        val fraction = ((value - range.start) / (range.endInclusive - range.start))
+            .coerceIn(0f, 1f)
+        RetroSettingsDynamicTrack(
+            fraction = fraction,
+            modifier = trackModifier
+        )
+    }
+    Slider(
+        value = value.toFloat().coerceIn(range.start, range.endInclusive),
+        onValueChange = { raw ->
+            val rounded = (raw / step).roundToInt() * step
+            onValueChange(
+                rounded.coerceIn(
+                    range.start.roundToInt(),
+                    range.endInclusive.roundToInt()
+                )
+            )
+        },
+        valueRange = range,
+        modifier = modifier
+            .alpha(0.01f)
+            .semantics { contentDescription = description },
+        colors = SliderDefaults.colors(
+            thumbColor = Color.Transparent,
+            activeTrackColor = Color.Transparent,
+            inactiveTrackColor = Color.Transparent,
+            activeTickColor = Color.Transparent,
+            inactiveTickColor = Color.Transparent
+        )
+    )
+}
+
+@Composable
+private fun RetroSettingsDynamicTrack(
+    fraction: Float,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier) {
+        val radius = CornerRadius(size.height * 0.42f)
+        drawRoundRect(
+            brush = Brush.verticalGradient(
+                listOf(Color(0xFF17150D), Color(0xFF080A06), Color(0xFF1D190E))
+            ),
+            cornerRadius = radius
+        )
+        drawRoundRect(
+            color = RetroBrassLight.copy(alpha = 0.78f),
+            cornerRadius = radius,
+            style = Stroke(width = 1.2.dp.toPx())
+        )
+
+        val inset = 5.dp.toPx().coerceAtMost(size.height * 0.25f)
+        val usableWidth = (size.width - inset * 2f).coerceAtLeast(1f)
+        val fillWidth = usableWidth * fraction
+        if (fillWidth > 0f) {
+            drawRoundRect(
+                brush = Brush.verticalGradient(
+                    listOf(
+                        RetroYellow.copy(alpha = 0.92f),
+                        RetroSage.copy(alpha = 0.96f),
+                        Color(0xFF78984D)
+                    )
+                ),
+                topLeft = Offset(inset, inset),
+                size = Size(fillWidth, size.height - inset * 2f),
+                cornerRadius = CornerRadius((size.height - inset * 2f) / 2f)
+            )
+        }
+
+        val thumbX = inset + usableWidth * fraction
+        val thumbWidth = (size.height * 0.28f).coerceAtLeast(5.dp.toPx())
+        drawRoundRect(
+            brush = Brush.horizontalGradient(
+                listOf(RetroBrassDark, RetroBrassLight, RetroBrassDark),
+                startX = thumbX - thumbWidth,
+                endX = thumbX + thumbWidth
+            ),
+            topLeft = Offset(thumbX - thumbWidth / 2f, -size.height * 0.08f),
+            size = Size(thumbWidth, size.height * 1.16f),
+            cornerRadius = CornerRadius(thumbWidth * 0.28f)
+        )
+        drawRoundRect(
+            color = Color.Black.copy(alpha = 0.72f),
+            topLeft = Offset(thumbX - thumbWidth / 2f, -size.height * 0.08f),
+            size = Size(thumbWidth, size.height * 1.16f),
+            cornerRadius = CornerRadius(thumbWidth * 0.28f),
+            style = Stroke(width = 1.dp.toPx())
+        )
+    }
+}
+
+@Composable
+private fun RetroSettingsToggleTarget(
+    checked: Boolean,
+    description: String,
+    modifier: Modifier,
+    dimWhenOff: Boolean = false,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .semantics { contentDescription = description }
+            .clickable(onClick = onClick)
+    ) {
+        Canvas(Modifier.fillMaxSize().clip(RoundedCornerShape(24.dp))) {
+            if (!checked && dimWhenOff) {
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.42f),
+                    cornerRadius = CornerRadius(size.height / 2f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RetroSettingsStatusText(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    listOf(
+                        Color(0xFF322512).copy(alpha = 0.98f),
+                        Color(0xFF322512).copy(alpha = 0.98f),
+                        Color.Transparent
+                    )
+                )
+            )
+        }
+        Text(
+            text = text,
+            color = RetroSage,
+            fontFamily = RetroMono,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
+    }
+}
+
+@Composable
+private fun RetroSettingsValuePatch(
+    text: String,
+    modifier: Modifier = Modifier,
+    drawBackground: Boolean = true
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        if (drawBackground) {
+            Canvas(Modifier.fillMaxSize().clip(RoundedCornerShape(4.dp))) {
+                drawRoundRect(
+                    brush = Brush.verticalGradient(
+                        listOf(Color(0xFF252113), Color(0xFF111209), Color(0xFF272113))
+                    ),
+                    cornerRadius = CornerRadius(4.dp.toPx())
+                )
+            }
+        }
+        Text(
+            text = text,
+            color = RetroSage,
+            fontFamily = RetroMono,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun RetroSettingsClickTarget(
+    description: String,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .semantics { contentDescription = description }
+            .clickable(onClick = onClick)
+    )
+}
 
 @Composable
 internal fun RetroPageHeader(

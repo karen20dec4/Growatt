@@ -972,3 +972,31 @@ collectorul, API-ul sau regula READ-ONLY.
 - Regula permanentă este salvată atât în skill-ul proiectului, cât și în copia globală: la finalul oricărei
   sarcini emulator/release se rulează obligatoriu `stop` și se verifică eliberarea resurselor, exceptând
   numai cererea explicită de a-l lăsa pornit.
+
+### 13.47 SETĂRI Retro V5 și navigare swipe (2026-07-27)
+
+- Pagina SETĂRI folosește exporturile Photoshop din
+  `android/build/emulator-artifacts/design/Pag-Setari/`: cardul SETĂRI, TEMA DASHBOARD și cardul
+  ALARMĂ/SUNET. Resursele Android lossless sunt `retro_settings_top_artwork.webp`,
+  `retro_settings_theme_artwork.webp` și `retro_settings_alarm_artwork.webp`.
+- Cele trei carduri păstrează raportul natural, pornesc la cota fizică de 40 px folosită pe celelalte
+  pagini și se redimensionează uniform numai când înălțimea disponibilă o cere. Pagina rămâne fixă,
+  fără scroll, iar NAV-ul este componenta globală comună.
+- Zonele Compose proporționale păstrează funcționale tema Retro/Simple, activarea alarmei, pragul
+  0–10000 W, cooldown-ul 0–600 s, vibrația, alegerea soneriei și testul alarmei. Numele soneriei este
+  dinamic; valorile diferite de 5000 W/300 s primesc un strat dinamic peste traseul fotografic.
+- Toate cele patru pagini acceptă swipe stânga/dreapta cu prag de 72 dp și tranziție laterală de 240 ms.
+  Gesturile scurte/verticale sunt ignorate, marginile nu depășesc TABLOU/SETĂRI, iar controalele copil
+  au prioritate. Nu este folosit `HorizontalPager`, deci ierarhia Android nu expune scroll.
+- Testele unitare, lint și debug build trec. În emulator Android 14, NAV-ul și swipe-urile
+  TABLOU–ENERGIE–SISTEM–SETĂRI au fost verificate în ambele direcții; glisarea pragului a păstrat tabul
+  SETĂRI, iar alarma a fost activată și oprită prin noile zone tactile.
+- La începutul etapei au fost șterse 336 fișiere generate vechi din rădăcina
+  `android/build/emulator-artifacts/`, eliberând 201.729.333 bytes. Directorul `design/` și toate sursele
+  Photoshop curente au fost păstrate.
+- Captura etalon este
+  `android/build/emulator-artifacts/pag-setari-v5-preview-1080x2400.png`. Versiunea rămâne
+  **versionCode 20 / versionName 3.07**; nu a fost creat încă un release nou.
+- Preview-ul 1080×2400 a fost livrat prin `@sun_tattva_access_bot`: mesaj ID **61**,
+  `file_unique_id` **AQADzQ5rGxugOVN8**. După verificare, emulatorul a fost oprit complet; serviciul este
+  `inactive/dead`, QEMU lipsește și ADB nu listează dispozitive.

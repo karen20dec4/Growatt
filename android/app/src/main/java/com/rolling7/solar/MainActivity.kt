@@ -1463,7 +1463,7 @@ private fun RetroSettingsPage(
     dashboardStyle: DashboardStyle,
     settings: AlarmSettings,
     ringtoneTitle: String,
-    version: String,
+    @Suppress("UNUSED_PARAMETER") version: String,
     onDashboardStyleChange: (DashboardStyle) -> Unit,
     onEnabledChange: (Boolean) -> Unit,
     onThresholdChange: (Int) -> Unit,
@@ -1472,204 +1472,18 @@ private fun RetroSettingsPage(
     onPickRingtone: () -> Unit,
     onTestAlarm: () -> Unit
 ) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        RetroPageHeader(
-            title = "SETARI",
-            subtitle = "TEMA · ALARMA · SUNET · APLICATIE",
-            statusColor = RetroYellow
-        )
-
-        RetroPanelSurface(
-            modifier = Modifier.height(88.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 9.dp),
-            fillContent = true
-        ) {
-            Text(
-                "TEMA DASHBOARD",
-                color = RetroText,
-                fontFamily = RetroMono,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp
-            )
-            Spacer(Modifier.height(5.dp))
-            DashboardStyleSwitcher(selected = dashboardStyle, onSelected = onDashboardStyleChange)
-            Spacer(Modifier.height(3.dp))
-            Text(
-                "RETRO: INSTRUMENTE INDUSTRIALE · SIMPLE: MATERIAL 3",
-                color = RetroMuted,
-                fontFamily = RetroMono,
-                fontSize = 7.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        RetroPanelSurface(
-            modifier = Modifier.weight(1f),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 13.dp, vertical = 10.dp),
-            fillContent = true,
-            verticalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "ALARMA CONSUM MARE",
-                        color = RetroText,
-                        fontFamily = RetroMono,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.6.sp
-                    )
-                    Text(
-                        if (settings.enabled) "ACTIVA · SERVICE PERMANENT" else "OPRITA",
-                        color = if (settings.enabled) RetroSage else RetroMuted,
-                        fontFamily = RetroMono,
-                        fontSize = 8.sp
-                    )
-                }
-                Switch(
-                    checked = settings.enabled,
-                    onCheckedChange = onEnabledChange,
-                    colors = retroSwitchColors()
-                )
-            }
-
-            SettingSlider(
-                title = "PRAG ALARMA",
-                value = settings.thresholdW,
-                valueLabel = "${settings.thresholdW} W",
-                range = 3000f..6500f,
-                step = 100,
-                retro = true,
-                compact = true,
-                onChange = onThresholdChange
-            )
-            Text(
-                "REARMARE LA ${settings.clearThresholdW} W",
-                color = RetroMuted,
-                fontFamily = RetroMono,
-                fontSize = 7.sp
-            )
-            SettingSlider(
-                title = "COOLDOWN",
-                value = settings.cooldownS,
-                valueLabel = "${settings.cooldownS}s",
-                range = 60f..600f,
-                step = 30,
-                retro = true,
-                compact = true,
-                onChange = onCooldownChange
-            )
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "VIBRATIE",
-                        color = RetroText,
-                        fontFamily = RetroMono,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "IMPULS SCURT LA DECLANSAREA ALARMEI",
-                        color = RetroMuted,
-                        fontFamily = RetroMono,
-                        fontSize = 7.sp,
-                        maxLines = 1
-                    )
-                }
-                Switch(
-                    checked = settings.vibrate,
-                    onCheckedChange = onVibrateChange,
-                    colors = retroSwitchColors()
-                )
-            }
-        }
-
-        RetroPanelSurface(
-            modifier = Modifier.height(92.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 9.dp),
-            fillContent = true
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "SUNET ALARMA",
-                        color = RetroText,
-                        fontFamily = RetroMono,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        ringtoneTitle,
-                        color = RetroMuted,
-                        fontFamily = RetroMono,
-                        fontSize = 8.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RetroMetalButton(
-                    modifier = Modifier.weight(1f).height(36.dp),
-                    selected = false,
-                    accent = RetroYellow,
-                    description = "Alege sunet alarma",
-                    onClick = onPickRingtone
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("ALEGE SUNET", color = RetroText, fontFamily = RetroMono, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                RetroMetalButton(
-                    modifier = Modifier.weight(1f).height(36.dp),
-                    selected = true,
-                    accent = RetroSage,
-                    description = "Testeaza alarma",
-                    onClick = onTestAlarm
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("TESTEAZA", color = RetroSage, fontFamily = RetroMono, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
-        RetroPanelSurface(
-            modifier = Modifier.height(84.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 13.dp, vertical = 9.dp),
-            fillContent = true
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("APLICATIE", color = RetroText, fontFamily = RetroMono, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        "VERSIUNE $version  ·  VYRA.GO.RO:31443  ·  API 2S",
-                        color = RetroMuted,
-                        fontFamily = RetroMono,
-                        fontSize = 7.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Text(
-                    "READ\nONLY",
-                    color = RetroSage,
-                    fontFamily = RetroMono,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
+    RetroSettingsArtworkPage(
+        dashboardStyle = dashboardStyle,
+        settings = settings,
+        ringtoneTitle = ringtoneTitle,
+        onDashboardStyleChange = onDashboardStyleChange,
+        onEnabledChange = onEnabledChange,
+        onThresholdChange = onThresholdChange,
+        onCooldownChange = onCooldownChange,
+        onVibrateChange = onVibrateChange,
+        onPickRingtone = onPickRingtone,
+        onTestAlarm = onTestAlarm
+    )
 }
 
 @Composable

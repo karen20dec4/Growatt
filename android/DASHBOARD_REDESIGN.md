@@ -142,6 +142,38 @@ Ambele plăci sunt centrate la 95% din lățime și păstrează proporțiile com
 înalte rămâne fundal metalic; cardurile nu sunt întinse automat până la NAV. Bara NAV este componenta
 globală existentă, nu o copie din imaginile paginii.
 
+### Pagina SETĂRI: structură fotografică V5
+
+SETĂRI folosește trei exporturi Photoshop independente, importate lossless pentru a păstra patina,
+zgârieturile, șuruburile și umbrele originale:
+
+- `retro_settings_top_artwork.webp` — titlul și indicatoarele TEMA/ALARMA/SUNET;
+- `retro_settings_theme_artwork.webp` — selectorul RETRO/SIMPLE;
+- `retro_settings_alarm_artwork.webp` — alarma, pragul, cooldown-ul, vibrația și sunetul.
+
+Cardurile pornesc la aceeași cotă fizică de 40 px ca TABLOU și SISTEM. Un calcul din
+`BoxWithConstraints` păstrează raportul real al fiecărui export și reduce uniform toate cardurile numai
+dacă înălțimea telefonului nu este suficientă. Nu există deformare separată pe X/Y și nu există scroll.
+NAV-ul rămâne componenta globală comună, fixată identic pe toate paginile.
+
+Compose adaugă zone tactile proporționale peste artwork. Tema, alarma, pragul 0–10000 W, cooldown-ul
+0–600 s, vibrația, selectorul de sonerie și testul de alarmă păstrează logica existentă. Slider-ele sunt
+invizibile în starea implicită pentru a nu acoperi materialul Photoshop; dacă valoarea diferă de exportul
+de bază, Compose desenează peste traseu poziția live. Numele soneriei rămâne text dinamic.
+
+### Navigare prin swipe
+
+Pe lângă NAV, `RetroDashboard` recunoaște swipe orizontal pe conținut:
+
+- swipe spre stânga deschide pagina următoare;
+- swipe spre dreapta deschide pagina anterioară;
+- prima și ultima pagină opresc navigarea la margine;
+- gesturile scurte sau predominant verticale sunt ignorate.
+
+Schimbarea folosește o tranziție laterală de 240 ms. Detectarea rulează după controalele copil: un slider
+sau buton care consumă gestul are prioritate și nu schimbă accidental pagina. Implementarea nu folosește
+`HorizontalPager`, deci nu introduce un container scrollabil și păstrează contractul ecranelor fixe.
+
 ## Tema Simple — explicatia redesignului initial
 
 ## 1. Ce pastreaza noul ecran
