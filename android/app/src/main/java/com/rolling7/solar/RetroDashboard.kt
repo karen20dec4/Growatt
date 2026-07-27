@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -15,6 +16,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -1588,7 +1590,7 @@ private fun RetroSettingsAlarmArtwork(
             contentScale = ContentScale.FillBounds
         )
 
-        RetroSettingsToggleTarget(
+        RetroSettingsAnimatedToggle(
             checked = settings.enabled,
             description = if (settings.enabled) "Alarma consum mare activa" else "Alarma consum mare oprita",
             modifier = Modifier
@@ -1597,19 +1599,17 @@ private fun RetroSettingsAlarmArtwork(
                 .height(scaleY * 125f),
             onClick = { onEnabledChange(!settings.enabled) }
         )
-        if (settings.enabled) {
-            RetroSettingsStatusText(
-                text = "ACTIVA",
-                modifier = Modifier
-                    .offset(x = scaleX * 132f, y = scaleY * 132f)
-                    .width(scaleX * 190f)
-                    .height(scaleY * 63f)
-            )
-        }
+        RetroSettingsStatusText(
+            text = if (settings.enabled) "ACTIVĂ" else "OPRITĂ",
+            color = if (settings.enabled) RetroSage else RetroBrassLight,
+            modifier = Modifier
+                .offset(x = scaleX * 140f, y = scaleY * 132f)
+                .width(scaleX * 205f)
+                .height(scaleY * 63f)
+        )
 
         RetroSettingsSlider(
             value = settings.thresholdW,
-            defaultValue = 5_000,
             range = 0f..10_000f,
             step = 100,
             description = "Prag alarma ${settings.thresholdW} W",
@@ -1617,25 +1617,23 @@ private fun RetroSettingsAlarmArtwork(
                 .offset(x = scaleX * 155f, y = scaleY * 293f)
                 .width(scaleX * 780f)
                 .height(scaleY * 125f),
-            trackModifier = Modifier
-                .offset(x = scaleX * 184f, y = scaleY * 324f)
-                .width(scaleX * 716f)
-                .height(scaleY * 54f),
+            thumbTrackModifier = Modifier
+                .offset(x = scaleX * 170f, y = scaleY * 303f)
+                .width(scaleX * 730f)
+                .height(scaleY * 92f),
             onValueChange = onThresholdChange
         )
-        if (settings.thresholdW != 5_000) {
-            RetroSettingsValuePatch(
-                text = "${settings.thresholdW} W",
-                modifier = Modifier
-                    .offset(x = scaleX * 670f, y = scaleY * 244f)
-                    .width(scaleX * 190f)
-                    .height(scaleY * 55f)
-            )
-        }
+        RetroSettingsValuePatch(
+            text = "${settings.thresholdW} W",
+            modifier = Modifier
+                .offset(x = scaleX * 650f, y = scaleY * 242f)
+                .width(scaleX * 220f)
+                .height(scaleY * 58f),
+            drawBackground = false
+        )
 
         RetroSettingsSlider(
             value = settings.cooldownS,
-            defaultValue = 300,
             range = 0f..600f,
             step = 30,
             description = "Cooldown ${settings.cooldownS} secunde",
@@ -1643,27 +1641,24 @@ private fun RetroSettingsAlarmArtwork(
                 .offset(x = scaleX * 155f, y = scaleY * 510f)
                 .width(scaleX * 780f)
                 .height(scaleY * 125f),
-            trackModifier = Modifier
-                .offset(x = scaleX * 184f, y = scaleY * 542f)
-                .width(scaleX * 716f)
-                .height(scaleY * 52f),
+            thumbTrackModifier = Modifier
+                .offset(x = scaleX * 170f, y = scaleY * 520f)
+                .width(scaleX * 730f)
+                .height(scaleY * 88f),
             onValueChange = onCooldownChange
         )
-        if (settings.cooldownS != 300) {
-            RetroSettingsValuePatch(
-                text = "${settings.cooldownS} s",
-                modifier = Modifier
-                    .offset(x = scaleX * 690f, y = scaleY * 462f)
-                    .width(scaleX * 180f)
-                    .height(scaleY * 54f),
-                drawBackground = false
-            )
-        }
+        RetroSettingsValuePatch(
+            text = "${settings.cooldownS} s",
+            modifier = Modifier
+                .offset(x = scaleX * 690f, y = scaleY * 462f)
+                .width(scaleX * 180f)
+                .height(scaleY * 54f),
+            drawBackground = false
+        )
 
-        RetroSettingsToggleTarget(
+        RetroSettingsAnimatedToggle(
             checked = settings.vibrate,
             description = if (settings.vibrate) "Vibratie activa" else "Vibratie oprita",
-            dimWhenOff = true,
             modifier = Modifier
                 .offset(x = scaleX * 705f, y = scaleY * 666f)
                 .width(scaleX * 215f)
@@ -1707,22 +1702,24 @@ private fun RetroSettingsAlarmArtwork(
 @Composable
 private fun RetroSettingsSlider(
     value: Int,
-    defaultValue: Int,
     range: ClosedFloatingPointRange<Float>,
     step: Int,
     description: String,
     modifier: Modifier,
-    trackModifier: Modifier,
+    thumbTrackModifier: Modifier,
     onValueChange: (Int) -> Unit
 ) {
-    if (value != defaultValue) {
-        val fraction = ((value - range.start) / (range.endInclusive - range.start))
-            .coerceIn(0f, 1f)
-        RetroSettingsDynamicTrack(
-            fraction = fraction,
-            modifier = trackModifier
-        )
-    }
+    val targetFraction = ((value - range.start) / (range.endInclusive - range.start))
+        .coerceIn(0f, 1f)
+    val animatedFraction by animateFloatAsState(
+        targetValue = targetFraction,
+        animationSpec = tween(durationMillis = 90, easing = FastOutSlowInEasing),
+        label = "$description pozitie"
+    )
+    RetroSettingsArtworkSliderThumb(
+        fraction = animatedFraction,
+        modifier = thumbTrackModifier
+    )
     Slider(
         value = value.toFloat().coerceIn(range.start, range.endInclusive),
         onValueChange = { raw ->
@@ -1749,83 +1746,107 @@ private fun RetroSettingsSlider(
 }
 
 @Composable
-private fun RetroSettingsDynamicTrack(
+private fun RetroSettingsArtworkSliderThumb(
     fraction: Float,
     modifier: Modifier = Modifier
 ) {
-    Canvas(modifier) {
-        val radius = CornerRadius(size.height * 0.42f)
-        drawRoundRect(
-            brush = Brush.verticalGradient(
-                listOf(Color(0xFF17150D), Color(0xFF080A06), Color(0xFF1D190E))
-            ),
-            cornerRadius = radius
-        )
-        drawRoundRect(
-            color = RetroBrassLight.copy(alpha = 0.78f),
-            cornerRadius = radius,
-            style = Stroke(width = 1.2.dp.toPx())
-        )
-
-        val inset = 5.dp.toPx().coerceAtMost(size.height * 0.25f)
-        val usableWidth = (size.width - inset * 2f).coerceAtLeast(1f)
-        val fillWidth = usableWidth * fraction
-        if (fillWidth > 0f) {
-            drawRoundRect(
-                brush = Brush.verticalGradient(
-                    listOf(
-                        RetroYellow.copy(alpha = 0.92f),
-                        RetroSage.copy(alpha = 0.96f),
-                        Color(0xFF78984D)
-                    )
-                ),
-                topLeft = Offset(inset, inset),
-                size = Size(fillWidth, size.height - inset * 2f),
-                cornerRadius = CornerRadius((size.height - inset * 2f) / 2f)
-            )
-        }
-
-        val thumbX = inset + usableWidth * fraction
-        val thumbWidth = (size.height * 0.28f).coerceAtLeast(5.dp.toPx())
-        drawRoundRect(
-            brush = Brush.horizontalGradient(
-                listOf(RetroBrassDark, RetroBrassLight, RetroBrassDark),
-                startX = thumbX - thumbWidth,
-                endX = thumbX + thumbWidth
-            ),
-            topLeft = Offset(thumbX - thumbWidth / 2f, -size.height * 0.08f),
-            size = Size(thumbWidth, size.height * 1.16f),
-            cornerRadius = CornerRadius(thumbWidth * 0.28f)
-        )
-        drawRoundRect(
-            color = Color.Black.copy(alpha = 0.72f),
-            topLeft = Offset(thumbX - thumbWidth / 2f, -size.height * 0.08f),
-            size = Size(thumbWidth, size.height * 1.16f),
-            cornerRadius = CornerRadius(thumbWidth * 0.28f),
-            style = Stroke(width = 1.dp.toPx())
+    BoxWithConstraints(modifier) {
+        val knobHeight = maxHeight
+        val knobWidth = knobHeight * (100f / 282f)
+        val travel = (maxWidth - knobWidth).coerceAtLeast(0.dp)
+        Image(
+            painter = painterResource(R.drawable.retro_settings_slider_knob),
+            contentDescription = null,
+            modifier = Modifier
+                .offset(x = travel * fraction)
+                .width(knobWidth)
+                .height(knobHeight),
+            contentScale = ContentScale.FillBounds
         )
     }
 }
 
 @Composable
-private fun RetroSettingsToggleTarget(
+private fun RetroSettingsAnimatedToggle(
     checked: Boolean,
     description: String,
     modifier: Modifier,
-    dimWhenOff: Boolean = false,
     onClick: () -> Unit
 ) {
+    val transition = updateTransition(
+        targetState = checked,
+        label = "$description tranzitie"
+    )
+    val progress by transition.animateFloat(
+        transitionSpec = {
+            tween(durationMillis = 260, easing = FastOutSlowInEasing)
+        },
+        label = "$description culisare"
+    ) { active ->
+        if (active) 1f else 0f
+    }
+
     Box(
         modifier = modifier
             .semantics { contentDescription = description }
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Canvas(Modifier.fillMaxSize().clip(RoundedCornerShape(24.dp))) {
-            if (!checked && dimWhenOff) {
-                drawRoundRect(
-                    color = Color.Black.copy(alpha = 0.42f),
-                    cornerRadius = CornerRadius(size.height / 2f)
-                )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(400f / 137f)
+        ) {
+            Image(
+                painter = painterResource(R.drawable.retro_settings_toggle_track),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.FillBounds
+            )
+
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                val knobSize = maxHeight * (104f / 137f)
+                val startX = maxWidth * (34f / 400f)
+                val endX = maxWidth * (286f / 400f)
+                val knobX = startX + (endX - startX) * progress
+                val knobY = (maxHeight - knobSize) / 2f
+                val glowSize = knobSize * (64f / 104f)
+                val moving = sin(progress * PI).toFloat().coerceAtLeast(0f)
+
+                Box(
+                    modifier = Modifier
+                        .offset(x = knobX, y = knobY)
+                        .width(knobSize)
+                        .height(knobSize),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(
+                            color = RetroSage.copy(
+                                alpha = 0.08f * progress + 0.18f * moving
+                            ),
+                            radius = size.minDimension * (0.52f + 0.08f * moving)
+                        )
+                    }
+                    Image(
+                        painter = painterResource(R.drawable.retro_settings_toggle_knob),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.FillBounds
+                    )
+                    Image(
+                        painter = painterResource(R.drawable.retro_settings_toggle_glow),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .width(glowSize)
+                            .height(glowSize)
+                            .alpha(progress),
+                        contentScale = ContentScale.FillBounds
+                    )
+                }
             }
         }
     }
@@ -1834,26 +1855,16 @@ private fun RetroSettingsToggleTarget(
 @Composable
 private fun RetroSettingsStatusText(
     text: String,
+    color: Color,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier,
         contentAlignment = Alignment.CenterStart
     ) {
-        Canvas(Modifier.fillMaxSize()) {
-            drawRect(
-                brush = Brush.horizontalGradient(
-                    listOf(
-                        Color(0xFF322512).copy(alpha = 0.98f),
-                        Color(0xFF322512).copy(alpha = 0.98f),
-                        Color.Transparent
-                    )
-                )
-            )
-        }
         Text(
             text = text,
-            color = RetroSage,
+            color = color,
             fontFamily = RetroMono,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
