@@ -1000,3 +1000,27 @@ collectorul, API-ul sau regula READ-ONLY.
 - Preview-ul 1080×2400 a fost livrat prin `@sun_tattva_access_bot`: mesaj ID **61**,
   `file_unique_id` **AQADzQ5rGxugOVN8**. După verificare, emulatorul a fost oprit complet; serviciul este
   `inactive/dead`, QEMU lipsește și ADB nu listează dispozitive.
+
+### 13.48 Release Android v3.08 — SETĂRI Retro V5 (2026-07-27)
+
+- Cardul ALARMĂ folosește exportul revizuit
+  `SETARI-card-alarma-optimized-v2.png`. Geometria rămâne 960×1077, sRGB cu alpha; conversia lossless în
+  `retro_settings_alarm_artwork.webp` are diferență pixel cu pixel zero. Nuanța olive/bronz este acum
+  apropiată de cardurile SETĂRI și TEMA, fără modificarea layoutului sau a zonelor tactile.
+- **versionCode 21 / versionName 3.08**; APK semnat:
+  `/opt/solar-monitor/SolarMonitor-v3.08.apk`.
+- Dimensiune: **6.998.764 bytes**; SHA-256:
+  `1fec210030d3a82156b7a51997158a467ba600d5286af341be237747e46f2c00`.
+- `aapt` confirmă pachetul `com.rolling7.solar`, target/compile SDK 34 și versiunea 3.08 (21).
+  `apksigner` confirmă APK Signature Scheme v2 și certificatul permanent Borealis Media, SHA-256
+  `b892e453841228510aa4c08f9a164652baa0005638279cc18572dde677d293f6`.
+- Upgrade real verificat pe emulator Android 14: instalare release semnat 3.07, apoi `adb install -r`
+  pentru 3.08. Toate cele patru taburi au trecut verificarea fără crash și fără container scrollabil;
+  swipe dreapta/stânga SETĂRI–SISTEM–SETĂRI a fost verificat pe APK-ul R8.
+- Captura release semnată este
+  `android/build/emulator-artifacts/release-v3.08-setari-signed-1080x2400.png`.
+- Livrare Telegram confirmată prin `@sun_tattva_access_bot`: mesaj ID **62**, nume
+  `SolarMonitor-v3.08.apk`, dimensiune 6.998.764 bytes, `file_unique_id` **AgADeyEAAhugOVM**. Fișierul
+  descărcat înapoi din Telegram are același SHA-256.
+- Release-ul modifică numai aplicația Android. API-ul și containerele serverului nu necesită rebuild;
+  accesul la invertor rămâne strict READ-ONLY.
