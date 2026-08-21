@@ -1,0 +1,15 @@
+[Unit]
+Description=Solar Monitor - ruleaza sonda end-to-end la 15 minute
+Documentation=file:/opt/solar-monitor/deploy/README-firewalld.md
+
+[Timer]
+# Prima rulare la 5 min dupa boot (containerele au timp sa porneasca), apoi la 15 min.
+# Timer monotonic, nu OnCalendar: nu ne intereseaza sa nimerim minute rotunde, ci
+# distanta constanta intre verificari. (`Persistent=` nu are efect pe timere monotonice.)
+OnBootSec=5min
+OnUnitActiveSec=15min
+AccuracySec=30s
+Unit=solar-watchdog.service
+
+[Install]
+WantedBy=timers.target

@@ -136,7 +136,7 @@ services:
     depends_on:
       - grafana
     ports:
-      - "443:443"
+      - "9443:443"
       # aplicatia de subtitrari (mp4-to-srt) prin acelasi Caddy/CA: vyra.go.ro:31480 -> 8443
       - "8443:8443"
     volumes:
@@ -151,3 +151,12 @@ volumes:
   ntfy-cache:
   caddy-data:
   caddy-config:
+
+networks:
+  # Numele interfetei bridge e fixat explicit. Implicit Docker o numeste `br-<id-retea>`,
+  # iar id-ul se schimba la fiecare recreare a retelei - ceea ce ar invalida regula
+  # firewalld care pune bridge-ul in zona `docker` (vezi deploy/README-firewalld.md).
+  # Max 15 caractere (IFNAMSIZ).
+  default:
+    driver_opts:
+      com.docker.network.bridge.name: br-solar

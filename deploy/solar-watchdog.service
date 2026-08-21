@@ -1,0 +1,12 @@
+[Unit]
+Description=Solar Monitor - sonda end-to-end (Caddy -> api -> InfluxDB)
+Documentation=file:/opt/solar-monitor/deploy/README-firewalld.md
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/solar-monitor/deploy/solar-watchdog.sh
+# Esecul sondei e o informatie, nu un motiv de restart; timer-ul reia oricum.
+SuccessExitStatus=0
+TimeoutStartSec=60
