@@ -1055,3 +1055,66 @@ collectorul, API-ul sau regula READ-ONLY.
   SHA-256 raportat de transport este identic.
 - Release-ul modifică numai aplicația Android și rămâne strict READ-ONLY. API-ul și containerele
   serverului nu necesită rebuild.
+
+### 13.50 Incident firewalld: aplicația pe „aștept date" 13 ore (2026-08-19 / 2026-08-20)
+
+**Simptom.** Aplicația Android a rămas pe „aștept date" din 19 aug ~20:56 până pe 20 aug ~10:15.
+Invertorul, cablul USB, collector-ul și InfluxDB erau perfect sănătoase: bateria raporta 56 V, datele
+din bucket-ul `live` erau proaspete la secundă. Nicio alertă nu s-a declanșat, pentru că nimic din ce
+era monitorizat nu se stricase.
+
+**Cauza.** `firewalld` (instalat de Virtualmin pe 2026-07-28, activ de atunci la fiecare boot) a fost
+**repornit**, nu pornit. Lanțul exact, din jurnal:
+
+1. `20:53:45` — `apt upgrade -y` (firefox-esr).
+2. `20:55:58` — **needrestart** pornește `restart-dbus.service` („Transient dbus restarter"); dbus cade
+   și antrenează în cascadă NetworkManager, wpa_supplicant și firewalld.
+3. `20:56:02` — firewalld repornit.
+
+Docker își înregistrează bridge-urile în zona firewalld `docker` doar ca **runtime config**. La restart
+firewalld încarcă numai configul permanent, iar Docker 26.1.5 își re-adaugă interfețele *exclusiv* la
+semnalul D-Bus `Reloaded`, nu după un restart complet. Bridge-urile au rămas fără zonă și au căzut pe
+politica implicită `reject with icmpx admin-prohibited` din `filter_FORWARD_POLICIES`.
+
+**De ce simptomul a fost înșelător.** Regula `ct state {established, related} accept` a lăsat intacte
+conexiunile deja deschise — de-aia collector-ul a continuat să scrie în InfluxDB toată noaptea. Doar
+conexiunile **noi** au fost respinse: `solar-api` → InfluxDB `Errno 113`, Caddy → `api`
+`502 dial tcp 172.18.0.2:8000: connect: no route to host`.
+
+**firewalld nu poate fi oprit.** `/etc/fail2ban/jail.d/virtualmin-firewalld.conf` setează
+`banaction = firewallcmd-rich-rules` (suprascrie default-ul Debian `nftables`) pentru toate cele 7
+jail-uri: sshd, postfix, postfix-sasl, dovecot, proftpd, webmin-auth, usermin-auth. Confirmat cu
+`fail2ban-client get sshd actions`.
+
+**Remedieri aplicate (2026-08-20).** Detaliile complete în `deploy/README-firewalld.md`.
+
+1. Bridge-urile puse **permanent** în zona `docker` (target `ACCEPT`), ca să supraviețuiască
+   restart / reload / reboot.
+2. Numele bridge-ului fixat la `br-solar` în `docker-compose.yml` prin
+   `driver_opts: com.docker.network.bridge.name`. Implicit era `br-<id-rețea>`, iar id-ul se schimbă la
+   fiecare `docker compose down` — regula firewalld ar fi rămas legată de o interfață inexistentă și
+   incidentul s-ar fi repetat tăcut.
+3. **Fără** `--add-source` pe subnet-uri. Ar fi supraviețuit redenumirii bridge-ului, dar
+   `net.ipv4.conf.enp1s0.rp_filter = 2` (loose) înseamnă că un pachet din internet cu sursă falsificată
+   din spațiul RFC1918 ar fi fost încadrat în zona `docker` (ACCEPT) în loc de `public`; zonele pe sursă
+   au prioritate față de cele pe interfață, deci nu s-ar fi putut corecta cu o rich rule în `public`.
+4. `/etc/needrestart/conf.d/90-solar-monitor-critical.conf` scoate `dbus`, `firewalld`, `docker` și
+   `containerd` din restartul automat la `apt upgrade`. Când needrestart le semnalează ca învechite,
+   răspunsul corect este un **reboot planificat**.
+5. Sondă end-to-end `solar-watchdog.timer` (la 15 min) — vezi mai jos.
+
+**Capcană la recreare.** Primul `docker compose up` după recrearea rețelei a eșuat cu
+`Failed to Setup IP tables: Unable to enable NAT rule: (dbus: connection closed by user)`: daemonul
+Docker avea conexiunea D-Bus către firewalld învechită după restartul firewalld. Leac:
+`systemctl restart docker`.
+
+**Sonda end-to-end.** `deploy/solar-watchdog.{sh,service,timer}` verifică exact lanțul pe care îl vede
+telefonul — `Caddy (9443, TLS intern) → api:8000 → InfluxDB → collector`. Eșec = HTTP ≠ 200, JSON
+invalid, **sau** `timestamp` mai vechi de `MAX_AGE_S` (180 s implicit); ultima condiție prinde cazul
+„API răspunde dar datele sunt înghețate". Alertă ntfy la primul eșec, apoi la fiecare al 4-lea
+consecutiv (o dată pe oră), plus mesaj de revenire la normal. Testate izolat toate trei căile (HTTP
+căzut, date vechi, revenire) cu `STATE_DIR` și `NTFY_BASE` redirecționate, ca să nu plece alerte reale.
+
+**Verificat după remediere.** `systemctl restart firewalld` nu mai rupe nimic: zona `docker` păstrează
+`br-solar`, `https://vyra.go.ro:9443/solar/latest` răspunde `200`, vârsta datelor sub 1 s, fail2ban activ.
+Nimic din acest incident nu a atins invertorul; sistemul rămâne strict **READ-ONLY**.

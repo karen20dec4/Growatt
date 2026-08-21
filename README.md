@@ -31,6 +31,26 @@ Invertor --USB (/dev/growatt)--> Collector Python (Modbus RTU, READ-ONLY)
     `-> Grafana (dashboard live 1s + istoric 30 zile)
 ```
 
+## Protocoale — cum ajung datele din invertor pe telefon
+
+Un singur protocol atinge invertorul; restul lanțului e HTTP obișnuit.
+
+| Etapă | Protocol | Detalii |
+|---|---|---|
+| Invertor → server | **Modbus RTU** peste **serial RS-232 prin USB** | 9600 baud, 8N1, timeout 1 s, slave `1`. Adaptor Exar XR21B1411 (`04e2:1411`, driver kernel `xr_serial`), fixat de udev pe `/dev/growatt`. |
+| Citirea propriu-zisă | **FC04** — Read Input Registers | `inst.read_registers(0, REG_COUNT, functioncode=4)`, un singur bloc de 91 registre, o dată pe secundă. **Singura** operație Modbus din tot proiectul. |
+| Collector → InfluxDB | HTTP (line protocol InfluxDB v2) | `http://influxdb:8086`, intern în rețeaua Docker |
+| API / Grafana → InfluxDB | HTTP + **Flux** | interogări pe bucket-urile `live` și `history` |
+| Telefon → server | **HTTPS** (TLS intern Caddy) + JSON | `https://vyra.go.ro:31443/solar/latest` → Caddy → `api:8000` |
+| Alerte → telefon | HTTP POST către **ntfy** | topic din `.env`, push nativ pe Android |
+
+Ce **nu** folosim, deliberat: fără ShineServer / cloud Growatt, fără MQTT, fără dongle
+WiFi/GPRS ShineWiFi (data-logger-ul oficial a fost scos — OTA-urile lui au blocat invertorul de
+trei ori în două zile), fără MODBUS TCP, fără scriere de niciun fel.
+
+Mapările registru → mărime fizică sunt în `parse()` din `collector/collector.py`, care este
+**sursa de adevăr**; tabelul de registre din `COPILOT_CONTEXT.md` are porțiuni învechite.
+
 ## ⚠️ GARANȚIE READ-ONLY
 
 Collector-ul **CITEȘTE DOAR**. Singura operație Modbus din `collector/collector.py`
@@ -49,6 +69,27 @@ docker compose ps           # status
 ```
 
 Stack-ul pornește automat la boot (`restart: unless-stopped` + Docker enabled).
+
+### Sondă end-to-end și firewall
+
+Alertele din `collector.py` acoperă invertorul. Sonda `solar-watchdog` acoperă *lanțul complet*,
+exact cum îl vede telefonul, și trimite push ntfy când se rupe:
+
+```bash
+systemctl list-timers solar-watchdog.timer   # rulează la 15 min
+systemctl start solar-watchdog.service       # verificare manuală acum
+journalctl -u solar-watchdog.service -n 20   # rezultate
+```
+
+Dacă aplicația arată „aștept date" deși collector-ul loghează normal, **prima verificare** e
+firewall-ul, nu invertorul:
+
+```bash
+firewall-cmd --get-active-zones   # br-solar TREBUIE să fie în zona docker
+```
+
+`Errno 113` / `no route to host` între containere = problemă de zonă firewalld. Context complet,
+cauza incidentului din 2026-08-19 și procedura de instalare: **`deploy/README-firewalld.md`**.
 
 ## Configurare
 

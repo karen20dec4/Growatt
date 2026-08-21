@@ -45,8 +45,14 @@ Inverter --USB (/dev/growatt)--> collector.py (minimalmodbus, FC04, polls every 
    `-> Grafana dashboard `solar-main` (live 1s + 30-day history)
 ```
 
-Four containers (`docker-compose.yml`): `solar-collector`, `solar-influxdb`, `solar-grafana`,
-`solar-ntfy`. All `restart: unless-stopped`, start on boot.
+Six containers (`docker-compose.yml`): `solar-collector`, `solar-influxdb`, `solar-grafana`,
+`solar-ntfy`, plus `solar-api` (READ-ONLY JSON micro-API for the Android app; no published port,
+reached internally at `api:8000`) and `solar-caddy` (HTTPS reverse proxy, `tls internal`, routes
+`/solar/*` → api and everything else → Grafana). All `restart: unless-stopped`, start on boot.
+
+They share one bridge network whose interface name is **pinned to `br-solar`** via
+`driver_opts: com.docker.network.bridge.name`. Do not remove that — the firewalld rule that keeps
+containers able to talk to each other is bound to that interface name (see Gotchas).
 
 - **InfluxDB**: org `casa`, Flux queries. `history` bucket is auto-created by the init env vars;
   the `live` bucket is created by `influxdb/init/10-create-live-bucket.sh` on first boot.
@@ -170,3 +176,15 @@ write a point to `live` (and to `history` every `HISTORY_INTERVAL`).
   `chmod -R a+rX /opt/solar-monitor/grafana`.
 - The InfluxDB CLI `influx bucket create --retention` accepts **only Go durations** (`48h`), not
   `2d`. (The `DOCKER_INFLUXDB_INIT_RETENTION` env var does accept `31d`.)
+- **firewalld cuts container-to-container traffic.** If the phone app shows "aștept date" while the
+  collector logs look perfectly healthy, check `firewall-cmd --get-active-zones` *before* suspecting
+  the inverter — `br-solar` must be in the `docker` zone. `Errno 113` / `no route to host` between
+  containers is always this. Established connections survive, so the collector keeps writing to
+  InfluxDB while `solar-api` returns 503 and Caddy returns 502 — a very misleading symptom. firewalld
+  cannot be disabled (fail2ban bans through it). Full story and fix: `deploy/README-firewalld.md`.
+- After a firewalld restart, `docker compose up` may fail with `Failed to Setup IP tables: Unable to
+  enable NAT rule: (dbus: connection closed by user)` — the daemon's D-Bus handle to firewalld is
+  stale. Cure: `systemctl restart docker`.
+- An end-to-end probe (`solar-watchdog.timer`, every 15 min) pushes to ntfy when the chain the phone
+  actually uses breaks; the collector's own alerts do not cover it. Sources in `deploy/`, units
+  installed in `/etc/systemd/system/`.
