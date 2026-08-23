@@ -1188,3 +1188,52 @@ rămân lucrul în curs al utilizatorului și nu au fost comise. Sistemul rămâ
    - Build de release semnat `SolarMonitor-v3.10.apk` (versionCode 23, versionName 3.10), SHA-256 `6573cf4c0c8cfbc8e2b1f6e9f761a37be56ffcad3d58dc7ec17c381c8292bf2a`, 7.071.252 bytes.
    - Livrare automată confirmată pe Telegram prin `@sun_tattva_access_bot` (message_id **77**, `file_unique_id` `AgADJCIAAhuGWFA`).
    - Sistemul rămâne strict **READ-ONLY**.
+
+### 13.52 Release Android v3.21 — intervalul `1d` cuantificat orar (2026-08-23)
+
+**Cerința.** La selectarea intervalului `1d`, graficul trebuie cuantificat pe oră — ultimele 24 h,
+24 de bare — peste tot unde există intervalul, nu doar pe graficele linie.
+
+**Ce era greșit.** Graficele linie (`output_power`, `pv_power`, `battery_voltage`) aveau deja
+`window: 1h`. Cele două grafice bară aveau `1d` cu fereastră de o zi, deci produceau 2 bare.
+
+**Cauza de fond.** `energy_pv_today` și `energy_load_today` sunt contoare zilnice cumulative care
+se resetează la miezul nopții (`u32(regs,48)*0.1`, `u32(regs,85)*0.1`). O fereastră de 1 h cu
+`fn: max` ar fi dat scara crescătoare a contorului, nu energia pe oră. Corect e derivarea în Flux:
+`aggregateWindow(every: 1h, fn: max)` urmat de `difference(nonNegative: true)`.
+
+**Modificări.**
+- `api/app.py`: cheie opțională `"diff": True` în configurația unui interval; când e prezentă se
+  inserează `difference(nonNegative: true)` între `aggregateWindow` și `keep`.
+- `api/app.py`: `1d` pentru cele două câmpuri bară devine
+  `{"start": "-25h", "window": "1h", "fn": "max", "diff": True}`. `-25h` pentru că `difference()`
+  consumă primul punct, deci ies exact 24 de valori orare.
+- `api/test_app.py`: trei teste pentru prezența/absența lui `difference` (9 teste în total, toate trec).
+- `MainActivity.kt`: `HistoryStatsGrid` primește `range`; la `1d` etichetele barelor devin
+  „Medie/ora", „Max ora", „Ultima ora". Intervalele devin uniform `1d`/`7d`, inclusiv pe bare.
+
+**Verificat.** Cele cinci câmpuri raportează 24–25 de puncte la `range=1d`. `energy_pv_today`
+întoarce energii orare reale: 0 noaptea, 0,3 kWh la răsărit (08:00), vârf **2,9 kWh la 14:00**,
+total 18,6 kWh pe 24 h. Confirmat vizual în emulator pe ambele grafice bară — 24 de bare cu
+etichete orare, fără derulare pe pagina Retro. Butoanele `1d`/`7d` se randează nativ, fără urme
+ale vechiului text „7d"/„30d" din WebP.
+
+**Limitare cunoscută.** Ora resetului de la miezul nopții este eliminată de `nonNegative`, deci
+ziua are 24 de bare acoperind 25 de ore, cu o oră lipsă în jurul orei 01:00. La producție e
+invizibilă (e 0 oricum); la consum se pierd ~0,3 kWh din total.
+
+**Flux de lucru.** Prima folosire a schemei „Claude planifică, Gemini execută, Claude verifică":
+branch `gemini/1d-orar`, specificație cu query-ul Flux validat în prealabil pe InfluxDB și criteriu
+de acceptare explicit, execuție cu `agy --model gemini-3.1-pro-high` (2 min 33 s), verificare
+independentă, merge în `main`.
+
+**Release.** `versionCode` 25, `versionName` 3.21, `SolarMonitor-v3.21.apk`, 7.071.252 bytes,
+SHA-256 `d615ec233ce9993e23e47103b24fc17c92f6d10bef718a2dabd84e05f8c71120`.
+API-ul de pe server a fost reconstruit (`docker compose up -d --build api`) — obligatoriu, altfel
+aplicația nouă ar primi „ISTORIC INDISPONIBIL" la `1d`.
+
+**Observat, nerezolvat.** Poza `retro_settings_alarm_artwork.webp` conține două greșeli de scris:
+„CODLDOWN" în loc de „COOLDOWN" și „Inpuls seurt la deslansarea alarmei" în loc de „Impuls scurt
+la declanșarea alarmei". Sunt pictate în bitmap, deci cer un export Photoshop nou.
+
+Sistemul rămâne strict **READ-ONLY** față de invertor.

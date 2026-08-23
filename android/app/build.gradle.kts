@@ -22,8 +22,8 @@ android {
         applicationId = "com.rolling7.solar"
         minSdk = 26
         targetSdk = 34
-        versionCode = 24
-        versionName = "3.20"
+        versionCode = 25
+        versionName = "3.21"
     }
 
     signingConfigs {
