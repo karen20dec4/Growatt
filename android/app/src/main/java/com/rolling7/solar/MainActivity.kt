@@ -1,6 +1,7 @@
 package com.rolling7.solar
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -53,6 +54,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -74,6 +76,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -87,6 +90,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -101,17 +105,22 @@ import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-private val CPv = Color(0xFF69C46F)
-private val CBat = Color(0xFFF4C542)
-private val CGrid = Color(0xFFE85663)
-private val CHouse = Color(0xFF5AA7F7)
-private val CPanel = Color(0xFF121923)
-private val CPanelSoft = Color(0xFF172130)
-private val CPanelRaised = Color(0xFF1B2635)
-private val CBg = Color(0xFF090D12)
-private val CLine = Color(0xFF263241)
-private val CMuted = Color(0xFF94A3B8)
-private val CText = Color(0xFFE5EDF6)
+// Paleta temei Simple - "high-tech" pe gri rece, deliberat diferita de Retro.
+// Fundalul e gri (nu alb) ca sa nu oboseasca ochiul; cardurile stau cu o treapta
+// mai sus decat pagina, de acolo vine senzatia de contur fara sa desenam borduri.
+// Accentele sunt mai inchise decat versiunea pe fond negru: un verde sau un
+// albastru luminos ar avea contrast prea mic pe gri deschis.
+private val CPv = Color(0xFF1F9D55)          // verde panouri
+private val CBat = Color(0xFFC2790A)         // ambru baterie
+private val CGrid = Color(0xFFD93A48)        // rosu retea
+private val CHouse = Color(0xFF0B72E7)       // albastru accent / casa
+private val CPanel = Color(0xFFF5F8FB)       // suprafata card
+private val CPanelSoft = Color(0xFFEAF0F7)   // card secundar / camp
+private val CPanelRaised = Color(0xFFFFFFFF) // card evidentiat
+private val CBg = Color(0xFFDDE3EA)          // fundal pagina
+private val CLine = Color(0xFFC9D3DE)        // separator
+private val CMuted = Color(0xFF586576)       // text secundar
+private val CText = Color(0xFF1B2432)        // text principal
 private const val DEAD = 50.0
 
 private data class DashboardChrome(
@@ -183,6 +192,20 @@ fun App() {
     val alarmMessage by AlarmState.message.collectAsState()
     val retro = dashboardStyle == DashboardStyle.RETRO
     val chrome = dashboardChrome(retro)
+    val view = LocalView.current
+
+    // Tema Simple e deschisa la culoare, Retro e inchisa. Bara de stare si cea de
+    // navigare trebuie sa urmeze fundalul temei, altfel raman negre peste un ecran
+    // luminos. `isAppearanceLight*` intoarce iconitele de sistem pe inchis.
+    LaunchedEffect(retro) {
+        val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
+        window.statusBarColor = chrome.background.toArgb()
+        window.navigationBarColor = chrome.background.toArgb()
+        WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = !retro
+            isAppearanceLightNavigationBars = !retro
+        }
+    }
 
     fun saveAlarmSettings(next: AlarmSettings, applyService: Boolean = true) {
         alarmSettings = next
@@ -237,10 +260,12 @@ fun App() {
         }
     }
 
-    MaterialTheme(
-        colorScheme = darkColorScheme(
-            primary = if (retro) RetroSage else CPv,
-            secondary = if (retro) RetroYellow else CHouse,
+    // Retro e tema inchisa, Simple e deschisa - schema Material trebuie sa fie a
+    // fiecareia, altfel dialogurile si meniurile Material raman pe culorile celeilalte.
+    val colors = if (retro) {
+        darkColorScheme(
+            primary = RetroSage,
+            secondary = RetroYellow,
             error = chrome.danger,
             background = chrome.background,
             surface = chrome.panel,
@@ -248,7 +273,26 @@ fun App() {
             onSurface = chrome.text,
             onBackground = chrome.text
         )
-    ) {
+    } else {
+        lightColorScheme(
+            primary = CHouse,
+            secondary = CPv,
+            error = chrome.danger,
+            background = chrome.background,
+            surface = chrome.panel,
+            surfaceVariant = chrome.raised,
+            onSurface = chrome.text,
+            onBackground = chrome.text,
+            // `tonalElevation` de pe Surface amesteca `surfaceTint` in culoarea cardului.
+            // Implicit tinta e `primary`, ceea ce pe fundal deschis spala cardurile in
+            // culoarea accentului. `Color.Transparent` NU rezolva: fiind 0x00000000, M3 ii
+            // pune alpha-ul de elevatie si compune negru peste card, deci il inchide.
+            // Corect e sa tintim chiar culoarea suprafetei - compunerea devine neutra.
+            surfaceTint = chrome.panel
+        )
+    }
+
+    MaterialTheme(colorScheme = colors) {
         when (dashboardStyle) {
             DashboardStyle.RETRO -> RetroDashboard(
                 data = data,
