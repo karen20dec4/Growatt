@@ -193,6 +193,20 @@ Vezi §3 de mai jos. **Fără el, butonul va scrie „7d" și va cere `1d`.**
 .codex/skills/solar-monitor-emulator/scripts/emulator-check.sh stop
 ```
 
+⚠️ **Verifică pe două profile de ecran, nu doar pe AVD.** Pixel 6 = 393×873 dp, dar telefonul
+utilizatorului e un **Samsung Note 9 = 411×846 dp**, cu 27 dp mai scurt. Un layout care încape pe
+emulator poate fi tăiat pe telefon — exact ce s-a întâmplat cu rândul de citiri gravate de pe
+TABLOU (`COPILOT_CONTEXT.md` §13.56):
+
+```bash
+ADB=/opt/android-sdk/platform-tools/adb
+$ADB shell wm size 1440x2960 && $ADB shell wm density 560   # profilul Note 9
+$ADB shell wm size reset     && $ADB shell wm density reset # inapoi la Pixel 6
+```
+
+Readu profilul implicit la final. Soluția durabilă nu e calibrarea de `dp` pe un singur ecran, ci
+layout adaptiv cu `weight` și `BoxWithConstraints`.
+
 Apoi §4 (Release) și §5 (Telegram).
 
 ---
