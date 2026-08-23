@@ -38,10 +38,17 @@ class RetroEnergyInteractionTest {
     }
 
     @Test
-    fun `only seven and thirty day ranges are accepted`() {
-        assertEquals("7d", normalizedRetroEnergyRange("7d"))
-        assertEquals("30d", normalizedRetroEnergyRange("30d"))
-        assertEquals("7d", normalizedRetroEnergyRange("24h"))
+    fun `line metrics accept one and seven day ranges`() {
+        assertEquals("1d", normalizedRetroEnergyRange("1d", "output_power"))
+        assertEquals("7d", normalizedRetroEnergyRange("7d", "output_power"))
+        assertEquals("1d", normalizedRetroEnergyRange("30d", "output_power"))
+    }
+
+    @Test
+    fun `bar metrics accept seven and thirty day ranges`() {
+        assertEquals("7d", normalizedRetroEnergyRange("7d", "energy_pv_today"))
+        assertEquals("30d", normalizedRetroEnergyRange("30d", "energy_pv_today"))
+        assertEquals("7d", normalizedRetroEnergyRange("1d", "energy_pv_today"))
     }
 
     @Test

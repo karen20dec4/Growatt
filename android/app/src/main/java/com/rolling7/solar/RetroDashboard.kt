@@ -732,25 +732,31 @@ private fun RetroEnergyControlsArtwork(
                 .height(scaleY * 100f),
             onClick = { onFieldClick("energy_load_today") }
         )
+        val ranges = retroEnergyRangesForField(selectedField)
+        val leftRange = ranges.getOrElse(0) { "1d" }
+        val rightRange = ranges.getOrElse(1) { "7d" }
+
         RetroEnergyTouchTarget(
-            description = "Interval 7 zile",
-            selected = selectedRange == "7d",
+            description = if (leftRange == "1d") "Interval 24 ore" else "Interval 7 zile",
+            selected = selectedRange == leftRange,
             accent = selectedAccent,
+            labelText = leftRange,
             modifier = Modifier
                 .offset(x = scaleX * 365f, y = scaleY * 390f)
                 .width(scaleX * 160f)
                 .height(scaleY * 82f),
-            onClick = { onRangeClick("7d") }
+            onClick = { onRangeClick(leftRange) }
         )
         RetroEnergyTouchTarget(
-            description = "Interval 30 zile",
-            selected = selectedRange == "30d",
+            description = if (rightRange == "7d") "Interval 7 zile" else "Interval 30 zile",
+            selected = selectedRange == rightRange,
             accent = selectedAccent,
+            labelText = rightRange,
             modifier = Modifier
                 .offset(x = scaleX * 525f, y = scaleY * 390f)
                 .width(scaleX * 160f)
                 .height(scaleY * 82f),
-            onClick = { onRangeClick("30d") }
+            onClick = { onRangeClick(rightRange) }
         )
 
         Box(
@@ -800,6 +806,7 @@ private fun RetroEnergyTouchTarget(
     selected: Boolean,
     accent: Color,
     modifier: Modifier,
+    labelText: String? = null,
     dimWhenInactive: Boolean = false,
     onClick: () -> Unit
 ) {
@@ -808,9 +815,55 @@ private fun RetroEnergyTouchTarget(
             .semantics {
                 contentDescription = "$description${if (selected) ", selectat" else ""}"
             }
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        if ((dimWhenInactive && !selected) || selected) {
+        if (labelText != null) {
+            Canvas(Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp))) {
+                drawRoundRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF22251A).copy(alpha = 0.95f),
+                            Color(0xFF14170E).copy(alpha = 0.98f),
+                            Color(0xFF1B1E14).copy(alpha = 0.95f)
+                        )
+                    ),
+                    cornerRadius = CornerRadius(6.dp.toPx())
+                )
+                if (selected) {
+                    drawRoundRect(
+                        color = accent.copy(alpha = 0.15f),
+                        cornerRadius = CornerRadius(6.dp.toPx())
+                    )
+                    drawRoundRect(
+                        color = accent.copy(alpha = 0.55f),
+                        cornerRadius = CornerRadius(6.dp.toPx()),
+                        style = Stroke(width = 1.dp.toPx())
+                    )
+                    drawLine(
+                        color = accent,
+                        start = Offset(size.width * 0.22f, size.height * 0.88f),
+                        end = Offset(size.width * 0.78f, size.height * 0.88f),
+                        strokeWidth = 1.5.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                } else {
+                    drawRoundRect(
+                        color = Color.Black.copy(alpha = 0.30f),
+                        cornerRadius = CornerRadius(6.dp.toPx()),
+                        style = Stroke(width = 0.75.dp.toPx())
+                    )
+                }
+            }
+            Text(
+                text = labelText,
+                color = if (selected) accent else RetroMuted,
+                fontFamily = RetroMono,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
+            )
+        } else if ((dimWhenInactive && !selected) || selected) {
             Canvas(Modifier.fillMaxSize().clip(RoundedCornerShape(7.dp))) {
                 if (dimWhenInactive && !selected) {
                     drawRoundRect(
@@ -1677,7 +1730,7 @@ private fun RetroSettingsAlarmArtwork(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                .offset(x = scaleX * 220f, y = scaleY * 890f)
+                .offset(x = scaleX * 220f, y = scaleY * 875f)
                 .width(scaleX * 360f)
         )
         RetroSettingsClickTarget(

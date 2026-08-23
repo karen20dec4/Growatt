@@ -6,7 +6,14 @@ internal enum class RetroEnergyTopSection {
     HISTORY
 }
 
-internal val RetroEnergyRanges = listOf("7d", "30d")
+internal val RetroEnergyLineRanges = listOf("1d", "7d")
+internal val RetroEnergyBarRanges = listOf("7d", "30d")
+internal val RetroEnergyRanges = listOf("1d", "7d")
+
+internal fun retroEnergyRangesForField(field: String): List<String> = when (field) {
+    "energy_pv_today", "energy_load_today" -> RetroEnergyBarRanges
+    else -> RetroEnergyLineRanges
+}
 
 internal fun retroEnergyTopSectionForField(field: String): RetroEnergyTopSection = when (field) {
     "energy_pv_today" -> RetroEnergyTopSection.PRODUCTION
@@ -36,5 +43,7 @@ internal fun retroEnergyChartTitle(field: String): String = when (field) {
     else -> "ISTORIC ENERGIE"
 }
 
-internal fun normalizedRetroEnergyRange(range: String): String =
-    range.takeIf(RetroEnergyRanges::contains) ?: RetroEnergyRanges.first()
+internal fun normalizedRetroEnergyRange(range: String, field: String = ""): String {
+    val allowed = if (field.isNotEmpty()) retroEnergyRangesForField(field) else RetroEnergyRanges
+    return range.takeIf(allowed::contains) ?: allowed.first()
+}

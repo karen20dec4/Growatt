@@ -392,6 +392,7 @@ private fun RetroEnergyPage(
     onMetricSelected: (HistoryMetric) -> Unit
 ) {
     var selectedRange by rememberSaveable { mutableStateOf(RetroEnergyRanges.first()) }
+    val activeRange = normalizedRetroEnergyRange(selectedRange, selectedMetric.field)
     var topSectionName by rememberSaveable(selectedMetric.field) {
         mutableStateOf(retroEnergyTopSectionForField(selectedMetric.field).name)
     }
@@ -401,11 +402,11 @@ private fun RetroEnergyPage(
         )
     }
     var reloadKey by rememberSaveable { mutableStateOf(0) }
-    var series by remember(selectedMetric.field, selectedRange, reloadKey) {
+    var series by remember(selectedMetric.field, activeRange, reloadKey) {
         mutableStateOf<HistorySeries?>(null)
     }
-    var loading by remember(selectedMetric.field, selectedRange, reloadKey) { mutableStateOf(true) }
-    var error by remember(selectedMetric.field, selectedRange, reloadKey) { mutableStateOf<String?>(null) }
+    var loading by remember(selectedMetric.field, activeRange, reloadKey) { mutableStateOf(true) }
+    var error by remember(selectedMetric.field, activeRange, reloadKey) { mutableStateOf<String?>(null) }
     val topSection = runCatching { RetroEnergyTopSection.valueOf(topSectionName) }
         .getOrDefault(retroEnergyTopSectionForField(selectedMetric.field))
 
@@ -415,12 +416,12 @@ private fun RetroEnergyPage(
         }
     }
 
-    LaunchedEffect(selectedMetric.field, selectedRange, reloadKey) {
+    LaunchedEffect(selectedMetric.field, activeRange, reloadKey) {
         loading = true
         error = null
         series = null
         val result = withContext(Dispatchers.IO) {
-            SolarRepository.fetchHistory(selectedMetric.field, selectedRange)
+            SolarRepository.fetchHistory(selectedMetric.field, activeRange)
         }
         if (result == null) {
             error = "ISTORIC INDISPONIBIL"
@@ -442,7 +443,7 @@ private fun RetroEnergyPage(
         data = data,
         selectedTopSection = topSection,
         selectedField = selectedMetric.field,
-        selectedRange = selectedRange,
+        selectedRange = activeRange,
         chartTitle = retroEnergyChartTitle(selectedMetric.field),
         onTopSectionClick = { section ->
             topSectionName = section.name
@@ -452,7 +453,7 @@ private fun RetroEnergyPage(
             }
         },
         onHistoryFieldClick = selectField,
-        onRangeClick = { selectedRange = normalizedRetroEnergyRange(it) },
+        onRangeClick = { selectedRange = normalizedRetroEnergyRange(it, selectedMetric.field) },
         chartContent = { modifier ->
             RetroEnergyEmbeddedHistoryChart(
                 metric = selectedMetric,
@@ -555,7 +556,7 @@ private fun RetroEnergyChartCanvas(
     } else {
         lineAxis(metric, values)
     }
-    val labelIndices = retroEnergyLabelIndices(series.points.size)
+    val labelIndices = retroEnergyLabelIndices(series.points.size, series.range)
 
     Canvas(modifier.padding(horizontal = 3.dp, vertical = 2.dp)) {
         val leftPad = 45.dp.toPx()
@@ -617,7 +618,7 @@ private fun RetroEnergyChartCanvas(
                 strokeWidth = 0.8.dp.toPx()
             )
             drawContext.canvas.nativeCanvas.drawText(
-                retroEnergyDateLabel(series.points[index].time),
+                retroEnergyDateLabel(series.points[index].time, series.range),
                 x,
                 size.height - 3.dp.toPx(),
                 xPaint
@@ -702,18 +703,27 @@ private fun RetroEnergyChartCanvas(
     }
 }
 
-private fun retroEnergyLabelIndices(pointCount: Int): List<Int> {
+private fun retroEnergyLabelIndices(pointCount: Int, range: String): List<Int> {
     if (pointCount <= 0) return emptyList()
     if (pointCount <= 4) return (0 until pointCount).toList()
+    if (range == "1d" || range == "24h" || range == "1h" || range == "6h") {
+        val step = max(1, pointCount / 5)
+        val list = (0 until pointCount step step).toMutableList()
+        if (list.last() != pointCount - 1) list.add(pointCount - 1)
+        return list.distinct()
+    }
     val last = pointCount - 1
     return listOf(0, last / 3, last * 2 / 3, last).distinct()
 }
 
-private fun retroEnergyDateLabel(value: String): String =
+private fun retroEnergyDateLabel(value: String, range: String): String =
     try {
-        OffsetDateTime.parse(value)
-            .atZoneSameInstant(LocalZone)
-            .format(DateTimeFormatter.ofPattern("dd.MM"))
+        val dt = OffsetDateTime.parse(value).atZoneSameInstant(LocalZone)
+        if (range == "1d" || range == "24h" || range == "1h" || range == "6h") {
+            dt.format(DateTimeFormatter.ofPattern("HH:mm"))
+        } else {
+            dt.format(DateTimeFormatter.ofPattern("dd.MM"))
+        }
     } catch (e: Exception) {
         ""
     }
@@ -1399,24 +1409,24 @@ private val DashboardHistoryMetrics = listOf(
         field = "output_power",
         unit = "W",
         color = CHouse,
-        defaultRange = "1h",
-        ranges = listOf("1h", "6h", "24h")
+        defaultRange = "1d",
+        ranges = listOf("1d", "7d")
     ),
     HistoryMetric(
         title = "Productie PV",
         field = "pv_power",
         unit = "W",
         color = CPv,
-        defaultRange = "24h",
-        ranges = listOf("1h", "6h", "24h")
+        defaultRange = "1d",
+        ranges = listOf("1d", "7d")
     ),
     HistoryMetric(
         title = "Baterie",
         field = "battery_voltage",
         unit = "V",
         color = CBat,
-        defaultRange = "24h",
-        ranges = listOf("1h", "6h", "24h"),
+        defaultRange = "1d",
+        ranges = listOf("1d", "7d"),
         thresholds = listOf(
             ChartThreshold(48.0, CGrid),
             ChartThreshold(57.0, CGrid)
@@ -1457,6 +1467,7 @@ private data class TimeTick(val timeMs: Long, val label: String)
 private val LocalZone: ZoneId = ZoneId.of("Europe/Bucharest")
 private val HourFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH")
 private val TimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+private val DayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM")
 
 @Composable
 private fun RetroSettingsPage(
@@ -2417,17 +2428,24 @@ private fun timeTicks(series: HistorySeries): List<TimeTick> {
     val stepMinutes = when (series.range) {
         "1h" -> 10L
         "6h" -> 60L
-        "24h" -> 180L
+        "1d", "24h" -> 60L
+        "7d" -> 1440L
+        "30d" -> 1440L * 5
         else -> 60L
     }
-    val formatter = if (series.range == "24h") HourFormatter else TimeFormatter
+    val formatter = when (series.range) {
+        "1d", "24h" -> HourFormatter
+        "7d", "30d" -> DayFormatter
+        else -> TimeFormatter
+    }
     var tick = floorToStep(OffsetDateTime.ofInstant(java.time.Instant.ofEpochMilli(first), LocalZone), stepMinutes)
     if (tick.toInstant().toEpochMilli() < first) {
         tick = tick.plusMinutes(stepMinutes)
     }
 
+    val maxTicks = if (series.range == "1d" || series.range == "24h") 32 else 16
     val out = mutableListOf<TimeTick>()
-    while (tick.toInstant().toEpochMilli() <= last && out.size < 16) {
+    while (tick.toInstant().toEpochMilli() <= last && out.size < maxTicks) {
         out += TimeTick(tick.toInstant().toEpochMilli(), tick.format(formatter))
         tick = tick.plusMinutes(stepMinutes)
     }

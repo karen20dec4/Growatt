@@ -1167,3 +1167,24 @@ Ambele opțiuni corecte sunt descrise în `docs/DEZVOLTARE.md` §2.2; alegerea �
 **Nemodificat.** Nu s-a atins niciun cod — doar documentație. Cele două fișiere Android modificate
 local (`build.gradle.kts` la versionCode 23 / versionName 3.10 și offset-ul din `RetroDashboard.kt`)
 rămân lucrul în curs al utilizatorului și nu au fost comise. Sistemul rămâne strict **READ-ONLY**.
+
+### 13.52 Interval 1d cu agregare orară (24 linii) și 7d/30d — Release v3.10 (2026-08-23)
+
+**Modificare.** La cererea utilizatorului s-a implementat **Opțiunea A**:
+1. **Grafice linie (`output_power`, `pv_power`, `battery_voltage`):**
+   - Suport pentru intervalele `1d` și `7d`.
+   - Pe intervalul `1d`, datele sunt agregate din InfluxDB bucket `history` cu `window: 1h, fn: mean` (rezultând 24 puncte/linii orare pe ultimele 24 de ore).
+   - Pe axa X și grila graficului sunt afișate repere orare formatate `HH:mm` (ex: 15:00, 20:00, 01:00, 06:00, 11:00).
+2. **Grafice bară (`energy_pv_today`, `energy_load_today`):**
+   - Păstrează intervalele `7d` (7 bare) și `30d` (30 bare) agregate cu `window: 1d, fn: max`, etichetate cu `dd.MM`.
+3. **UI Retro dinamic peste bitmap:**
+   - Butoanele de interval din `RetroEnergyControlsArtwork` afișează dinamic etichetele corespunzătoare seriei selectate (`1d` / `7d` pentru linie, respectiv `7d` / `30d` pentru bară), cu un badge stilizat retro/industrial peste bitmap.
+4. **API (`api/app.py`):**
+   - Adăugat intervalul `1d` în `HISTORY_FIELDS` pentru toate cele 5 serii de istoric.
+   - Containerul `solar-api` a fost reconstruit și relansat (`docker compose up -d --build api`).
+5. **Verificare și Release:**
+   - Testele unitare Python (`api/test_app.py`, 6 teste) și Android (`testDebugUnitTest`, 20 teste) au trecut 100%.
+   - Verificare vizuală completă pe emulatorul headless KVM (`emulator-check.sh verify`, `retro-tabs`, capturi `panouri-1d-fixed.png`, `panouri-7d.png`, `casa-1d-hourly.png`).
+   - Build de release semnat `SolarMonitor-v3.10.apk` (versionCode 23, versionName 3.10), SHA-256 `6573cf4c0c8cfbc8e2b1f6e9f761a37be56ffcad3d58dc7ec17c381c8292bf2a`, 7.071.252 bytes.
+   - Livrare automată confirmată pe Telegram prin `@sun_tattva_access_bot` (message_id **77**, `file_unique_id` `AgADJCIAAhuGWFA`).
+   - Sistemul rămâne strict **READ-ONLY**.

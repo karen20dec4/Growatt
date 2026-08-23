@@ -37,6 +37,7 @@ HISTORY_FIELDS = {
             "1h": {"start": "-1h", "window": "30s", "bucket": "live", "fn": "mean"},
             "6h": {"start": "-6h", "window": "2m", "bucket": "live", "fn": "mean"},
             "24h": {"start": "-24h", "window": "5m", "bucket": "history", "fn": "mean"},
+            "1d": {"start": "-1d", "window": "1h", "bucket": "history", "fn": "mean"},
             "7d": {"start": "-7d", "window": "30m", "bucket": "history", "fn": "mean"},
             "30d": {"start": "-30d", "window": "2h", "bucket": "history", "fn": "mean"},
         },
@@ -47,6 +48,7 @@ HISTORY_FIELDS = {
             "1h": {"start": "-1h", "window": "30s", "bucket": "live", "fn": "mean"},
             "6h": {"start": "-6h", "window": "2m", "bucket": "live", "fn": "mean"},
             "24h": {"start": "-24h", "window": "5m", "bucket": "history", "fn": "mean"},
+            "1d": {"start": "-1d", "window": "1h", "bucket": "history", "fn": "mean"},
             "7d": {"start": "-7d", "window": "30m", "bucket": "history", "fn": "mean"},
             "30d": {"start": "-30d", "window": "2h", "bucket": "history", "fn": "mean"},
         },
@@ -57,6 +59,7 @@ HISTORY_FIELDS = {
             "1h": {"start": "-1h", "window": "30s", "bucket": "live", "fn": "mean"},
             "6h": {"start": "-6h", "window": "2m", "bucket": "live", "fn": "mean"},
             "24h": {"start": "-24h", "window": "5m", "bucket": "history", "fn": "mean"},
+            "1d": {"start": "-1d", "window": "1h", "bucket": "history", "fn": "mean"},
             "7d": {"start": "-7d", "window": "30m", "bucket": "history", "fn": "mean"},
             "30d": {"start": "-30d", "window": "2h", "bucket": "history", "fn": "mean"},
         },
@@ -64,6 +67,7 @@ HISTORY_FIELDS = {
     "energy_pv_today": {
         "label": "Produs", "unit": "kWh", "chart": "bar",
         "ranges": {
+            "1d": {"start": "-1d", "window": "1d", "bucket": "history", "fn": "max"},
             "7d": {"start": "-7d", "window": "1d", "bucket": "history", "fn": "max"},
             "30d": {"start": "-30d", "window": "1d", "bucket": "history", "fn": "max"},
         },
@@ -71,6 +75,7 @@ HISTORY_FIELDS = {
     "energy_load_today": {
         "label": "Consum", "unit": "kWh", "chart": "bar",
         "ranges": {
+            "1d": {"start": "-1d", "window": "1d", "bucket": "history", "fn": "max"},
             "7d": {"start": "-7d", "window": "1d", "bucket": "history", "fn": "max"},
             "30d": {"start": "-30d", "window": "1d", "bucket": "history", "fn": "max"},
         },

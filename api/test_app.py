@@ -48,6 +48,7 @@ class HistoryApiTest(unittest.TestCase):
     def test_energy_page_line_metrics_support_seven_and_thirty_days(self):
         for field in ("output_power", "pv_power", "battery_voltage"):
             for range_key, start, window in (
+                ("1d", "-1d", "1h"),
                 ("7d", "-7d", "30m"),
                 ("30d", "-30d", "2h"),
             ):
@@ -65,9 +66,10 @@ class HistoryApiTest(unittest.TestCase):
 
     def test_daily_energy_metrics_keep_bar_contract(self):
         for field in ("energy_pv_today", "energy_load_today"):
-            response = self.client.get(f"/history?field={field}&range=7d")
-            self.assertEqual(200, response.status_code)
-            self.assertEqual("bar", response.get_json()["chart"])
+            for range_key in ("1d", "7d", "30d"):
+                response = self.client.get(f"/history?field={field}&range={range_key}")
+                self.assertEqual(200, response.status_code)
+                self.assertEqual("bar", response.get_json()["chart"])
 
     def test_system_temperature_supports_one_hour_mini_chart(self):
         response = self.client.get("/history?field=inverter_temp&range=1h")
