@@ -1299,3 +1299,37 @@ restructurare. Tema Retro nu a fost atinsă vizual; singura modificare acolo e
 `retroSwipeNavigation` trecut de la `private` la `internal`.
 
 Sistemul rămâne strict **READ-ONLY** față de invertor.
+
+### 13.54 TABLOU compactat, cadran cu relief + release v3.23 (2026-08-23)
+
+Cerințe primite după v3.22, toate implementate:
+
+1. **Cardul PANOURI dispare**; PV1/PV2/TOTAL intră sub cadran, în același card, despărțite de o
+   linie. Se câștigă un card întreg.
+2. **Ilustrația bateriei regenerată** — prima variantă avea fundal în degrade care lăsa un
+   dreptunghi gri vizibil pe card.
+3. **Titlurile de card scoase** de pe TABLOU; spațiul câștigat a mers în înălțimea diagramei de
+   flux (200 → 268 dp), ca panoul să stea vizibil mai sus decât casa.
+4. **Praguri fixe pe cadran**: galben de la 5500 W, roșu de la 6000 W până la 7000 W. Nu mai
+   depind de pragul de alarmă din setări.
+5. **Relief 3D**: gradient radial pe fața discului (lumină stânga-sus), umbră proprie pe inel,
+   gradient + umbră pe ac și pe butuc, `Shadow` în stilul textului pentru valoare.
+
+**Bug de geometrie, prins doar în captură.** Fața cadranului e un cerc **întreg**, dar raza era
+calculată pentru sectorul de 240° (care ocupă `2R` pe lățime dar doar `1.5R` pe înălțime), deci
+discul ieșea din card peste rândul PV. Rezolvat cu `BoxWithConstraints`: raza încape pe ambele
+axe, iar valoarea se poziționează relativ la rază, nu la marginea de jos a cutiei.
+
+**Rețetă pentru ilustrațiile generate.** Cea mai fiabilă cale găsită: cere-i lui `generate_image`
+fundal **magenta plat** (`#FF00FF`), apoi local
+`-fuzz 38% -transparent magenta` + `-channel A -morphology Erode Disk:2 +channel`. Erodarea
+șterge franjurile magenta rămase pe umbra difuză. Magenta nu apare în obiectele astea, deci
+decupajul e curat — spre deosebire de fundalul gri-albastru, unde floodfill-ul se oprește în
+umbră și lasă un dreptunghi.
+
+**Curățat**: `SimpleCardHeader`, `EnergyOverview`, `DailySummary`, `EnergyNode` — nu mai erau
+apelate după restructurare.
+
+**Release.** `versionCode` 27, `versionName` 3.23, `SolarMonitor-v3.23.apk`, 7.213.764 bytes,
+SHA-256 `a7c2d2d5b8b7dbb9f1e303344a9f22cff2fc3c371a040b01c96567e13ed18c62`, Telegram mesaj **81**,
+SHA-256 descărcat înapoi identic. Sistemul rămâne strict **READ-ONLY**.
