@@ -1333,3 +1333,32 @@ apelate după restructurare.
 **Release.** `versionCode` 27, `versionName` 3.23, `SolarMonitor-v3.23.apk`, 7.213.764 bytes,
 SHA-256 `a7c2d2d5b8b7dbb9f1e303344a9f22cff2fc3c371a040b01c96567e13ed18c62`, Telegram mesaj **81**,
 SHA-256 descărcat înapoi identic. Sistemul rămâne strict **READ-ONLY**.
+
+### 13.55 Valori cu relief, citiri gravate + release v3.24 (2026-08-23)
+
+Cerințe după v3.23, toate implementate:
+
+1. **Valorile în wați cresc cu ~30%** și primesc aceeași umbră comună (`ValueShadow`): rândul PV
+   18 → 23 sp, valorile din diagrama de flux 19 → 25 sp, valoarea cadranului 36 → 46 sp.
+   Unitățile cresc proporțional.
+2. **Diagrama de flux se strânge** de la 268 la 226 dp — după mărirea fontului distanța
+   panou–casă devenise prea mare și legătura nu se mai citea ca flux.
+3. **Cele trei citiri de jos** (tensiune baterie, autoconsum invertor, temperatură invertor —
+   același set ca pe TABLOU-ul Retro) devin `EngravedReadout`.
+
+**Rețeta pentru efectul de gravură**, cerut de utilizator („sculptate, umbră negativă, ceva
+high-tech"), fără nicio imagine:
+
+- adâncitura are fundul cu gradient vertical (`#D5DDE7` → `#F2F6FA`), deci pare scobită;
+- peste ea, un contur de 3,5 dp cu gradient vertical: gri închis la 70% sus, aproape transparent
+  la mijloc, alb pur jos. Muchia de sus în umbră + muchia de jos în lumină = adâncitură;
+- cifra e desenată **de două ori**: o copie albă decalată cu (1 dp, 1,5 dp), apoi textul colorat
+  peste ea. Compose acceptă un singur `Shadow` pe text, deci copia decalată e singura cale să
+  obții gravură (lumină jos-dreapta) în loc de relief (umbră jos-dreapta).
+
+Verificat în emulator: TABLOU fără noduri `scrollable`, totul încape deasupra barei de navigare,
+inclusiv o valoare de patru cifre în cadran (testat la 1670 W).
+
+**Release.** `versionCode` 28, `versionName` 3.24, `SolarMonitor-v3.24.apk`, 7.213.764 bytes,
+SHA-256 `329ff2b998f7cd65cbcaa80173ab46d50c9a2b2116754e92f215580d68bd3cba`, Telegram mesaj **82**,
+SHA-256 descărcat înapoi identic. Sistemul rămâne strict **READ-ONLY**.
