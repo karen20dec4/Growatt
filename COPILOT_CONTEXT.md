@@ -1118,3 +1118,52 @@ căzut, date vechi, revenire) cu `STATE_DIR` și `NTFY_BASE` redirecționate, ca
 **Verificat după remediere.** `systemctl restart firewalld` nu mai rupe nimic: zona `docker` păstrează
 `br-solar`, `https://vyra.go.ro:9443/solar/latest` răspunde `200`, vârsta datelor sub 1 s, fail2ban activ.
 Nimic din acest incident nu a atins invertorul; sistemul rămâne strict **READ-ONLY**.
+
+### 13.51 Predare proiect către Gemini — documentație de continuare (2026-08-23)
+
+**Context.** Utilizatorul dă proiectul mai departe unui alt agent (Gemini CLI). Prima sarcină
+planificată pentru el: schimbarea intervalelor graficelor din `7d`/`30d` în `1d`/`7d` și livrarea
+unui release pe Telegram. Documentația existentă era scrisă pentru cineva care avea deja contextul
+sesiunilor anterioare, deci s-a scris un set de intrare autonom.
+
+**Fișiere noi.**
+
+- `GEMINI.md` (rădăcina repo-ului) — punct de intrare citit automat de Gemini CLI, echivalentul lui
+  `CLAUDE.md`, în română: invariantul READ-ONLY cu ambele decizii închise (§13.14, §13.17), cele șase
+  containere și lanțul de rețea până la telefon, tabelul de protocoale, `.env` și `REG_COUNT`,
+  comenzile uzuale, cum funcționează `parse()` și alertele, regulile UI-ului Retro, emulatorul,
+  regula de versionare, convențiile de limbă, capcanele (firewalld, D-Bus, SNI Caddy, grafana `chmod`)
+  și lista de fișiere care nu se comit niciodată.
+- `docs/DEZVOLTARE.md` — ghidul de dezvoltare propriu-zis: harta verticală a celor 9 straturi cu
+  fișierul de editat pentru fiecare, contractul `/solar/latest` și `/solar/history`, regula de alegere
+  a bucket-ului în funcție de interval, exemplul complet al schimbării de intervale, capcana
+  etichetelor din poze, procedura de release, livrarea pe Telegram, checklist de încheiere și lista
+  „ce NU face proiectul".
+
+**Fișiere actualizate.**
+
+- `README.md` — secțiune nouă **Documentație**: tabel cu toate cele 10 fișiere de documentație din
+  repo și ce conține fiecare (utilizatorul a cerut explicit lista).
+- `CLAUDE.md` — trimitere către `docs/DEZVOLTARE.md` și `GEMINI.md` cu obligația de a le ține
+  sincronizate; capcană nouă documentată la secțiunea Retro (vezi mai jos).
+
+**Descoperire tehnică relevantă pentru prima sarcină.** Etichetele `7d` / `30d` de pe butoanele de
+interval **nu sunt randate de Compose** — sunt desenate în
+`retro_energy_controls_chart_artwork.webp` (1024×1266 px, spațiu logic Compose 1045×1292, factor
+0,9799). Zonele: butonul stâng x 358–514, butonul drept x 514–671, y 382–463 în pixeli de asset.
+Codul Kotlin desenează doar zona tactilă transparentă și evidențierea, peste poză. Schimbarea numai
+a stringului din Kotlin ar produce un buton care scrie una și cere alta.
+
+**A doua descoperire.** Pagina ENERGIE Retro folosește aceleași două butoane de interval pentru toate
+cele cinci câmpuri (`output_power`, `pv_power`, `battery_voltage`, `energy_pv_today`,
+`energy_load_today`), iar `/history` validează cu listă albă și dă `400` la un `range` necunoscut.
+Deci `1d` trebuie adăugat în `HISTORY_FIELDS` din `api/app.py` la toate cinci, altfel butonul nou dă
+„ISTORIC INDISPONIBIL". Pentru cele două grafice **bară** există o problemă de semantică:
+`energy_pv_today` / `energy_load_today` sunt contoare zilnice cumulative (`u32(regs,48)*0.1`,
+`u32(regs,85)*0.1`), agregate cu `window: 1d, fn: max` — un interval `1d` dă **o singură bară**.
+Ambele opțiuni corecte sunt descrise în `docs/DEZVOLTARE.md` §2.2; alegerea îi revine utilizatorului.
+`window: 1h, fn: max` este **greșit** pe aceste câmpuri (ar da o scară crescătoare, nu consum orar).
+
+**Nemodificat.** Nu s-a atins niciun cod — doar documentație. Cele două fișiere Android modificate
+local (`build.gradle.kts` la versionCode 23 / versionName 3.10 și offset-ul din `RetroDashboard.kt`)
+rămân lucrul în curs al utilizatorului și nu au fost comise. Sistemul rămâne strict **READ-ONLY**.

@@ -9,6 +9,18 @@ replaces the Growatt cloud / ShinePhone app. A Python collector polls the invert
 RTU and writes to InfluxDB; Grafana visualizes; ntfy pushes alerts to a phone. Everything runs in
 Docker Compose on a small server in the basement (IP `192.168.1.199`).
 
+## Where the rest of the docs are
+
+`README.md` has the full documentation index. The two that matter most alongside this file:
+
+- **`docs/DEZVOLTARE.md`** — the development guide: the vertical map of which file to touch for
+  each layer (collector → InfluxDB → `api/app.py` → `SolarRepository.kt` → Compose → WebP
+  artwork), how to add a feature end to end, the Android release + Telegram delivery procedure,
+  and the end-of-task checklist. **Read it before the first code change.**
+- **`GEMINI.md`** — same operating rules as this file, in Romanian, for Gemini CLI (which loads
+  `GEMINI.md` automatically the way Claude Code loads `CLAUDE.md`). If you change a rule, a
+  command, a port or a container here, change it there too — they are meant to stay in sync.
+
 ## ⚠️ The one hard invariant: READ-ONLY
 
 The official data-logger was removed because OTA firmware updates bricked the inverter three times
@@ -127,6 +139,12 @@ not enough for UI work: inspect the captured PNG after `verify`.
 The Retro UI is a fixed full-screen four-tab instrument panel. It must never gain vertical scrolling:
 the page content fits above the fixed photo navigation bar. Keep photographic chassis assets decorative;
 live values, the gauge needle, LEDs, semantics and click targets must remain native Compose and dynamic.
+
+**Static labels are painted into the WebP, not rendered by Compose.** The `7d` / `30d` range buttons on
+the ENERGIE page, the tab names, the dial captions — those are pixels. Changing the string in Kotlin
+leaves the photo saying the old thing while the button does the new thing. Rule of thumb: if the text
+does not appear inside a `Text(...)` call, it is in the artwork and needs a repaint (ideally a fresh
+Photoshop export from the user). Coordinates and the check command are in `docs/DEZVOLTARE.md` §3.
 
 **Deploy flow:** edit locally → `git push` → on the server `cd /opt/solar-monitor && git pull &&
 docker compose up -d --build`. To debug the Modbus mapping live, set `DEBUG_RAW=1` in `.env`,

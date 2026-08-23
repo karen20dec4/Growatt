@@ -21,6 +21,23 @@ Monitorizare 100% locală (self-hosted), **READ-ONLY**, fără cloud / fără Sh
 - **InfluxDB:** http://192.168.1.199:8086
   - credentialele sunt în `.env` pe server
 
+## Documentație
+
+Toate fișierele de documentație din repo, în ordinea în care le citești:
+
+| Fișier | Conținut |
+|---|---|
+| **`GEMINI.md`** | Punct de intrare pentru agentul AI care continuă proiectul (Gemini CLI îl citește automat): invariantul READ-ONLY, arhitectura, protocoalele, comenzile, regulile UI-ului Retro, capcanele. |
+| **`CLAUDE.md`** | Echivalentul pentru Claude Code. Același conținut esențial; ține-le sincronizate când schimbi o regulă. |
+| **`docs/DEZVOLTARE.md`** | **Ghidul de dezvoltare.** Harta verticală a straturilor, cum adaugi o funcție cap-coadă, capcana etichetelor desenate în poze, procedura de release Android și livrarea pe Telegram, checklist de încheiere. |
+| **`COPILOT_CONTEXT.md`** | Jurnal de sesiuni și decizii (secțiunile `13.x`): istoricul descoperirii registrelor, fiecare release, incidente. Tabelul de registre are porțiuni **învechite** — `collector/collector.py` e sursa de adevăr. |
+| **`deploy/README-firewalld.md`** | firewalld, rețeaua Docker, sonda end-to-end. De citit la orice problemă de trafic între containere. |
+| **`android/DASHBOARD_REDESIGN.md`** | Design-ul temelor `Simple` și `Retro`, arhitectura hibridă fotografie + Compose, lista resurselor. |
+| **`deploy-windows.md`** | Fluxul de lucru de pe stația Windows (Android Studio, scp către server). |
+| **`.codex/skills/solar-monitor-emulator/SKILL.md`** | Emulatorul Android headless: comenzi, AVD, renderer, politica de oprire. |
+| **`.codex/skills/solar-monitor-release/SKILL.md`** | Fluxul de release al APK-ului, pe scurt. |
+| `README.md` | Fișierul de față: acces, arhitectură, protocoale, operare. |
+
 ## Arhitectură
 
 ```
