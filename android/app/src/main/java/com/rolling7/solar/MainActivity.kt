@@ -979,6 +979,10 @@ private fun SimpleGauge(
         contentAlignment = Alignment.Center
     ) {
         val gaugeRadius = (kotlin.math.min(maxWidth.value, maxHeight.value) / 2f - 10f).dp
+        // Valoarea trebuie sa se micsoreze odata cu cadranul. Cu font fix, pe un ecran mai
+        // scurt (Note 9) cifrele ajung peste etichetele "0" si "7".
+        val valueSp = (gaugeRadius.value * 0.36f).coerceIn(24f, 44f).sp
+        val unitSp = (valueSp.value * 0.45f).sp
 
         Canvas(Modifier.fillMaxSize()) {
             val radius = gaugeRadius.toPx()
@@ -1044,7 +1048,7 @@ private fun SimpleGauge(
 
             // Gradatii si cifre.
             val tickRadiusOut = radius - ringWidth - 4.dp.toPx()
-            val textRadius = radius - ringWidth - 26.dp.toPx()
+            val textRadius = radius - ringWidth - radius * 0.22f
             val bigTicks = 7
             val totalTicks = bigTicks * 5
 
@@ -1130,14 +1134,14 @@ private fun SimpleGauge(
         Column(
             modifier = Modifier
                 .align(Alignment.Center)
-                .offset(y = gaugeRadius * 0.54f),
+                .offset(y = gaugeRadius * 0.60f),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = powerW.roundToInt().toString(),
                     color = CText,
-                    fontSize = 46.sp,
+                    fontSize = valueSp,
                     fontWeight = FontWeight.Bold,
                     style = LocalTextStyle.current.copy(shadow = ValueShadow)
                 )
@@ -1145,9 +1149,9 @@ private fun SimpleGauge(
                 Text(
                     text = "W",
                     color = CHouse,
-                    fontSize = 21.sp,
+                    fontSize = unitSp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 7.dp)
+                    modifier = Modifier.padding(bottom = (valueSp.value * 0.15f).dp)
                 )
             }
         }
@@ -1225,17 +1229,17 @@ private fun SimpleDashboard(
 
                                 // 2. Card CONSUM CASA
                                 Surface(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().weight(0.54f),
                                     shape = RoundedCornerShape(20.dp),
                                     color = CPanel,
                                     tonalElevation = 2.dp
                                 ) {
                                     // Panourile stau in acelasi card cu cadranul: consumul si
                                     // productia se citesc dintr-o privire, si castigam un card.
-                                    Column(Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp)) {
+                                    Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp)) {
                                         SimpleGauge(
                                             powerW = data?.house ?: 0.0,
-                                            modifier = Modifier.fillMaxWidth().height(238.dp)
+                                            modifier = Modifier.fillMaxWidth().weight(1f).heightIn(min = 150.dp)
                                         )
                                         Spacer(Modifier.height(4.dp))
                                         HorizontalDivider(color = CLine.copy(alpha = 0.55f))
@@ -1276,15 +1280,15 @@ private fun SimpleDashboard(
                                 // inaltimea diagramei, ca panoul sa stea vizibil mai sus decat
                                 // casa si sa se citeasca sensul curgerii.
                                 Surface(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().weight(0.46f),
                                     shape = RoundedCornerShape(16.dp),
                                     color = CPanel,
                                     tonalElevation = 1.dp
                                 ) {
-                                    Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                                    Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp)) {
                                         EnergyFlow(
                                             data = data,
-                                            modifier = Modifier.height(226.dp),
+                                            modifier = Modifier.fillMaxSize().heightIn(min = 170.dp),
                                             onHistoryClick = onHistoryFieldClick
                                         )
                                     }
@@ -1424,16 +1428,21 @@ private fun EnergyFlow(data: SolarData?, modifier: Modifier = Modifier, onHistor
         label = "pozitie particule"
     )
 
-    Box(
+    BoxWithConstraints(
         modifier.fillMaxWidth()
     ) {
+        val imageSize = kotlin.math.min(58f, kotlin.math.max(44f, maxHeight.value * 0.26f)).dp
+        
         Canvas(Modifier.fillMaxSize()) {
+            val imageRadius = imageSize.toPx() / 2f
+            val textHeight = 31.dp.toPx()
+
             // Asezare ca in referinta: panoul sus la mijloc, casa jos la mijloc, bateria in
             // stanga ei, stalpul in dreapta. Coordonatele trebuie sa cada peste centrele
             // ilustratiilor de mai jos, altfel liniile pornesc de nicaieri.
-            val sideInset = 58.dp.toPx()
-            val bottomRow = size.height - 60.dp.toPx()
-            val solar = Offset(size.width / 2f, 29.dp.toPx())
+            val sideInset = 50.dp.toPx()
+            val bottomRow = size.height - (imageRadius + textHeight)
+            val solar = Offset(size.width / 2f, imageRadius)
             val house = Offset(size.width / 2f, bottomRow)
             val batteryNode = Offset(sideInset, bottomRow)
             val gridNode = Offset(size.width - sideInset, bottomRow)
@@ -1486,17 +1495,17 @@ private fun EnergyFlow(data: SolarData?, modifier: Modifier = Modifier, onHistor
             // Capatul de sus trece pe langa poza SI pe langa valoarea de sub ea.
             connection(
                 solar, house, active = pv > DEAD, color = CPv,
-                startGap = 62.dp.toPx(), endGap = 34.dp.toPx()
+                startGap = imageRadius + textHeight + 2.dp.toPx(), endGap = imageRadius + 5.dp.toPx()
             )
             connection(
                 batteryNode, house,
                 active = discharging || charging,
                 color = if (charging) CPv else CBat,
-                startGap = 36.dp.toPx(), endGap = 36.dp.toPx()
+                startGap = imageRadius + 7.dp.toPx(), endGap = imageRadius + 7.dp.toPx()
             )
             connection(
                 gridNode, house, active = grid > DEAD, color = CGrid,
-                startGap = 36.dp.toPx(), endGap = 36.dp.toPx()
+                startGap = imageRadius + 7.dp.toPx(), endGap = imageRadius + 7.dp.toPx()
             )
         }
 
@@ -1506,6 +1515,7 @@ private fun EnergyFlow(data: SolarData?, modifier: Modifier = Modifier, onHistor
             description = "Panouri",
             value = wholeNumber(data?.pv),
             color = CPv,
+            imageSize = imageSize,
             onClick = { onHistoryClick(historyMetric("pv_power")) }
         )
         FlowIllustration(
@@ -1514,6 +1524,7 @@ private fun EnergyFlow(data: SolarData?, modifier: Modifier = Modifier, onHistor
             description = "Baterie",
             value = signedNumber(data?.batteryDisplay),
             color = data?.let { batteryColor(it.batteryVoltage) } ?: CMuted,
+            imageSize = imageSize,
             onClick = { onHistoryClick(historyMetric("battery_voltage")) }
         )
         FlowIllustration(
@@ -1522,6 +1533,7 @@ private fun EnergyFlow(data: SolarData?, modifier: Modifier = Modifier, onHistor
             description = "Casa",
             value = wholeNumber(data?.house),
             color = CHouse,
+            imageSize = imageSize,
             onClick = { onHistoryClick(historyMetric("output_power")) }
         )
         FlowIllustration(
@@ -1529,7 +1541,8 @@ private fun EnergyFlow(data: SolarData?, modifier: Modifier = Modifier, onHistor
             imageRes = R.drawable.simple_flow_stalp,
             description = "Retea",
             value = wholeNumber(if (data == null) null else grid),
-            color = CGrid
+            color = CGrid,
+            imageSize = imageSize
         )
     }
 }
@@ -1546,6 +1559,7 @@ private fun FlowIllustration(
     description: String,
     value: String,
     color: Color,
+    imageSize: androidx.compose.ui.unit.Dp,
     onClick: (() -> Unit)? = null
 ) {
     val clickModifier = if (onClick == null) Modifier else Modifier.clickable(onClick = onClick)
@@ -1559,7 +1573,7 @@ private fun FlowIllustration(
         Image(
             painter = painterResource(imageRes),
             contentDescription = null,
-            modifier = Modifier.size(58.dp)
+            modifier = Modifier.size(imageSize)
         )
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
