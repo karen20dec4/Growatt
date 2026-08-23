@@ -67,7 +67,7 @@ HISTORY_FIELDS = {
     "energy_pv_today": {
         "label": "Produs", "unit": "kWh", "chart": "bar",
         "ranges": {
-            "1d": {"start": "-1d", "window": "1d", "bucket": "history", "fn": "max"},
+            "1d": {"start": "-25h", "window": "1h", "bucket": "history", "fn": "max", "diff": True},
             "7d": {"start": "-7d", "window": "1d", "bucket": "history", "fn": "max"},
             "30d": {"start": "-30d", "window": "1d", "bucket": "history", "fn": "max"},
         },
@@ -75,7 +75,7 @@ HISTORY_FIELDS = {
     "energy_load_today": {
         "label": "Consum", "unit": "kWh", "chart": "bar",
         "ranges": {
-            "1d": {"start": "-1d", "window": "1d", "bucket": "history", "fn": "max"},
+            "1d": {"start": "-25h", "window": "1h", "bucket": "history", "fn": "max", "diff": True},
             "7d": {"start": "-7d", "window": "1d", "bucket": "history", "fn": "max"},
             "30d": {"start": "-30d", "window": "1d", "bucket": "history", "fn": "max"},
         },
@@ -136,8 +136,10 @@ def history():
         f'from(bucket: "{bucket}") |> range(start: {range_cfg["start"]}) '
         f'|> filter(fn: (r) => r._measurement == "inverter" and r._field == "{field}") '
         f'|> aggregateWindow(every: {range_cfg["window"]}, fn: {range_cfg["fn"]}, createEmpty: false) '
-        '|> keep(columns: ["_time", "_value"])'
     )
+    if range_cfg.get("diff"):
+        q += '|> difference(nonNegative: true) '
+    q += '|> keep(columns: ["_time", "_value"])'
 
     points = []
     try:

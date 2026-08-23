@@ -6,14 +6,9 @@ internal enum class RetroEnergyTopSection {
     HISTORY
 }
 
-internal val RetroEnergyLineRanges = listOf("1d", "7d")
-internal val RetroEnergyBarRanges = listOf("7d", "30d")
 internal val RetroEnergyRanges = listOf("1d", "7d")
 
-internal fun retroEnergyRangesForField(field: String): List<String> = when (field) {
-    "energy_pv_today", "energy_load_today" -> RetroEnergyBarRanges
-    else -> RetroEnergyLineRanges
-}
+internal fun retroEnergyRangesForField(field: String): List<String> = RetroEnergyRanges
 
 internal fun retroEnergyTopSectionForField(field: String): RetroEnergyTopSection = when (field) {
     "energy_pv_today" -> RetroEnergyTopSection.PRODUCTION

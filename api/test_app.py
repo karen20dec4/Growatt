@@ -98,6 +98,21 @@ class HistoryApiTest(unittest.TestCase):
         self.assertEqual(400, response.status_code)
         self.assertEqual("range nepermis", response.get_json()["error"])
 
+    def test_energy_pv_today_1d_includes_difference(self):
+        response = self.client.get("/history?field=energy_pv_today&range=1d")
+        self.assertEqual(200, response.status_code)
+        self.assertIn("difference(nonNegative: true)", self.queries[-1])
+
+    def test_pv_power_1d_excludes_difference(self):
+        response = self.client.get("/history?field=pv_power&range=1d")
+        self.assertEqual(200, response.status_code)
+        self.assertNotIn("difference(nonNegative: true)", self.queries[-1])
+
+    def test_energy_pv_today_7d_excludes_difference(self):
+        response = self.client.get("/history?field=energy_pv_today&range=7d")
+        self.assertEqual(200, response.status_code)
+        self.assertNotIn("difference(nonNegative: true)", self.queries[-1])
+
 
 if __name__ == "__main__":
     unittest.main()

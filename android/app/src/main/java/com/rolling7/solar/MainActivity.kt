@@ -1438,7 +1438,7 @@ private val DashboardHistoryMetrics = listOf(
         unit = "kWh",
         color = CPv,
         defaultRange = "7d",
-        ranges = listOf("7d", "30d"),
+        ranges = listOf("1d", "7d"),
         chartStyle = ChartStyle.Bar
     ),
     HistoryMetric(
@@ -1447,7 +1447,7 @@ private val DashboardHistoryMetrics = listOf(
         unit = "kWh",
         color = CHouse,
         defaultRange = "7d",
-        ranges = listOf("7d", "30d"),
+        ranges = listOf("1d", "7d"),
         chartStyle = ChartStyle.Bar
     )
 )
@@ -1937,14 +1937,14 @@ private fun HistorySheet(
                             )
                             Spacer(Modifier.height(7.dp))
                             loaded.stats?.let { stats ->
-                                HistoryStatsGrid(stats = stats, metric = metric, retro = retro, compact = true)
+                                HistoryStatsGrid(stats = stats, metric = metric, retro = retro, compact = true, range = loaded.range)
                             }
                         }
                     } else {
                         HistoryChart(series = loaded, metric = metric, retro = retro)
                         Spacer(Modifier.height(14.dp))
                         loaded.stats?.let { stats ->
-                            HistoryStatsGrid(stats = stats, metric = metric, retro = retro)
+                            HistoryStatsGrid(stats = stats, metric = metric, retro = retro, range = loaded.range)
                         }
                     }
                 }
@@ -2249,7 +2249,8 @@ private fun HistoryStatsGrid(
     stats: HistoryStats,
     metric: HistoryMetric,
     retro: Boolean,
-    compact: Boolean = false
+    compact: Boolean = false,
+    range: String = "7d"
 ) {
     val accent = historyAccent(metric.field, metric.color, retro)
     if (compact) {
@@ -2283,14 +2284,17 @@ private fun HistoryStatsGrid(
         return
     }
     if (metric.chartStyle == ChartStyle.Bar) {
+        val avgLabel = if (range == "1d") "Medie/ora" else "Medie/zi"
+        val maxLabel = if (range == "1d") "Max ora" else "Max zi"
+        val lastLabel = if (range == "1d") "Ultima ora" else "Ultima zi"
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatTile(Modifier.weight(1f), "Total", formatHistoryValue(stats.sum, metric.unit), accent, retro)
-                StatTile(Modifier.weight(1f), "Medie/zi", formatHistoryValue(stats.avg, metric.unit), accent, retro)
+                StatTile(Modifier.weight(1f), avgLabel, formatHistoryValue(stats.avg, metric.unit), accent, retro)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatTile(Modifier.weight(1f), "Max zi", formatHistoryValue(stats.max, metric.unit), accent, retro)
-                StatTile(Modifier.weight(1f), "Ultima zi", formatHistoryValue(stats.last, metric.unit), accent, retro)
+                StatTile(Modifier.weight(1f), maxLabel, formatHistoryValue(stats.max, metric.unit), accent, retro)
+                StatTile(Modifier.weight(1f), lastLabel, formatHistoryValue(stats.last, metric.unit), accent, retro)
             }
         }
         return
