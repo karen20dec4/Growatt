@@ -26,6 +26,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,6 +55,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -84,6 +87,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -132,6 +138,13 @@ private val CLine = Color(0xFFC9D3DE)        // separator
 private val CMuted = Color(0xFF586576)       // text secundar
 private val CText = Color(0xFF1B2432)        // text principal
 private const val DEAD = 50.0
+
+// Cadranul din tema Simple. Pragurile sunt fixe, nu legate de alarma din setari:
+// invertorul se protejeaza pe la ~6.6 kW, iar scala e citita ca o limita a aparatului.
+private const val GAUGE_MAX_W = 7000f
+private const val GAUGE_WARN_W = 5500f
+private const val GAUGE_DANGER_W = 6000f
+private val CGaugeWarn = Color(0xFFE9B209)   // galben avertizare
 
 private data class DashboardChrome(
     val background: Color,
@@ -386,7 +399,6 @@ fun App() {
             )
             DashboardStyle.SIMPLE -> SimpleDashboard(
                 data = data,
-                alarmThresholdW = alarmSettings.thresholdW,
                 selectedTab = RetroTab.valueOf(retroTabName),
                 onTabSelected = { tab -> retroTabName = tab.name },
                 onHistoryFieldClick = { 
@@ -850,176 +862,198 @@ private fun RetroMetricButton(
     }
 }
 
-
-@Composable
-private fun SimpleCardHeader(iconRes: Int, title: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(CHouse.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                painter = painterResource(id = iconRes),
-                contentDescription = null,
-                tint = CHouse,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = title,
-            color = CText,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
-}
-
 @Composable
 private fun SimpleGauge(
     powerW: Double,
-    alarmThresholdW: Int,
     modifier: Modifier = Modifier
 ) {
     val animatedPower by animateFloatAsState(
-        targetValue = powerW.toFloat().coerceIn(0f, 7000f),
+        targetValue = powerW.toFloat().coerceIn(0f, GAUGE_MAX_W),
         animationSpec = tween(700),
         label = "GaugeAngle"
     )
     val startAngle = 150f
     val sweepAngle = 240f
-    
-    Box(
+
+    // Fata cadranului e un disc intreg, nu doar sectorul arcului, deci cutia trebuie sa
+    // incapa un cerc complet: raza se limiteaza si pe latime si pe inaltime.
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .semantics { contentDescription = "Consum casa ${powerW.roundToInt()} wati din maximum 7000" },
+            .semantics {
+                contentDescription =
+                    "Consum casa ${powerW.roundToInt()} wati din maximum ${GAUGE_MAX_W.roundToInt()}"
+            },
         contentAlignment = Alignment.Center
     ) {
+        val gaugeRadius = (kotlin.math.min(maxWidth.value, maxHeight.value) / 2f - 10f).dp
+
         Canvas(Modifier.fillMaxSize()) {
-            // Arcul merge de la 150 grade, peste varf, pana la 30 de grade. Punctele lui cele
-            // mai de jos sunt la +0.5R fata de centru, deci desenul ocupa 2R pe latime si
-            // 1.5R pe inaltime. Raza trebuie limitata de ambele, altfel cadranul se taie.
-            val pad = 12.dp.toPx()
-            val radius = kotlin.math.min(size.width / 2f, size.height / 1.5f) - pad
-            val centerOffset = Offset(size.width / 2f, radius + pad)
-            
-            // 1. Pista
+            val radius = gaugeRadius.toPx()
+            val centerOffset = Offset(size.width / 2f, size.height / 2f)
+            val ringWidth = 12.dp.toPx()
+
+            fun angleOf(watts: Float) = startAngle + (watts / GAUGE_MAX_W) * sweepAngle
+            fun arcBox(r: Float) = Offset(centerOffset.x - r, centerOffset.y - r)
+
+            // Fata cadranului: gradient radial deschis in centru, mai inchis spre margine.
+            // De aici vine senzatia de suprafata bombata.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color.White, CPanelRaised, Color(0xFFE7ECF2)),
+                    center = Offset(centerOffset.x - radius * 0.22f, centerOffset.y - radius * 0.26f),
+                    radius = radius * 1.15f
+                ),
+                radius = radius - ringWidth * 0.55f,
+                center = centerOffset
+            )
+
+            // Umbra proprie a inelului, decalata in jos-dreapta.
             drawArc(
-                color = CHouse.copy(alpha = 0.16f),
+                color = Color(0xFF9AA7B4).copy(alpha = 0.28f),
                 startAngle = startAngle,
                 sweepAngle = sweepAngle,
                 useCenter = false,
-                style = Stroke(width = 11.dp.toPx(), cap = StrokeCap.Round),
-                topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
-                size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+                style = Stroke(width = ringWidth, cap = StrokeCap.Round),
+                topLeft = arcBox(radius) + Offset(1.5.dp.toPx(), 2.5.dp.toPx()),
+                size = Size(radius * 2, radius * 2)
             )
-            
-            // 2. Zona de avertizare
-            val alarmStartValue = alarmThresholdW.toFloat().coerceIn(0f, 7000f)
-            if (alarmStartValue < 7000f) {
-                val alarmStartAngle = startAngle + (alarmStartValue / 7000f) * sweepAngle
-                val alarmSweepAngle = sweepAngle - (alarmStartValue / 7000f) * sweepAngle
+
+            // Pista, cu gradient ca sa nu para plata.
+            drawArc(
+                brush = Brush.linearGradient(
+                    colors = listOf(CHouse.copy(alpha = 0.30f), CHouse.copy(alpha = 0.13f)),
+                    start = Offset(centerOffset.x - radius, centerOffset.y - radius),
+                    end = Offset(centerOffset.x + radius, centerOffset.y + radius)
+                ),
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = false,
+                style = Stroke(width = ringWidth, cap = StrokeCap.Round),
+                topLeft = arcBox(radius),
+                size = Size(radius * 2, radius * 2)
+            )
+
+            // Zonele de avertizare: galben de la 5500 W, rosu de la 6000 W pana la capat.
+            fun zone(fromW: Float, toW: Float, color: Color) {
+                val from = angleOf(fromW)
                 drawArc(
-                    color = CBat,
-                    startAngle = alarmStartAngle,
-                    sweepAngle = alarmSweepAngle,
+                    color = color,
+                    startAngle = from,
+                    sweepAngle = angleOf(toW) - from,
                     useCenter = false,
-                    style = Stroke(width = 11.dp.toPx(), cap = StrokeCap.Round),
-                    topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
-                    size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+                    style = Stroke(width = ringWidth),
+                    topLeft = arcBox(radius),
+                    size = Size(radius * 2, radius * 2)
                 )
             }
-            
-            // 3. Gradatii
-            val tickRadiusOut = radius - 16.dp.toPx()
-            val textRadius = radius - 36.dp.toPx()
-            val numBigTicks = 7
-            val totalTicks = numBigTicks * 5
-            
+            zone(GAUGE_WARN_W, GAUGE_DANGER_W, CGaugeWarn)
+            zone(GAUGE_DANGER_W, GAUGE_MAX_W, CGrid)
+
+            // Gradatii si cifre.
+            val tickRadiusOut = radius - ringWidth - 4.dp.toPx()
+            val textRadius = radius - ringWidth - 26.dp.toPx()
+            val bigTicks = 7
+            val totalTicks = bigTicks * 5
+
             val textPaint = Paint().apply {
                 color = CMuted.toArgb()
                 textSize = 13.sp.toPx()
                 textAlign = Paint.Align.CENTER
+                isAntiAlias = true
             }
-            
+
             for (i in 0..totalTicks) {
-                val fraction = i.toFloat() / totalTicks
-                val angle = startAngle + fraction * sweepAngle
-                val angleRad = Math.toRadians(angle.toDouble())
-                
+                val angleRad = Math.toRadians((startAngle + i.toFloat() / totalTicks * sweepAngle).toDouble())
+                val cos = kotlin.math.cos(angleRad).toFloat()
+                val sin = kotlin.math.sin(angleRad).toFloat()
                 val isBig = i % 5 == 0
-                val tickLen = if (isBig) 10.dp.toPx() else 5.dp.toPx()
-                val tickWidth = if (isBig) 2.dp.toPx() else 1.5.dp.toPx()
-                val tickColor = if (isBig) CMuted.copy(alpha = 0.75f) else CMuted.copy(alpha = 0.40f)
-                
-                val outX = centerOffset.x + tickRadiusOut * kotlin.math.cos(angleRad).toFloat()
-                val outY = centerOffset.y + tickRadiusOut * kotlin.math.sin(angleRad).toFloat()
-                val inX = centerOffset.x + (tickRadiusOut - tickLen) * kotlin.math.cos(angleRad).toFloat()
-                val inY = centerOffset.y + (tickRadiusOut - tickLen) * kotlin.math.sin(angleRad).toFloat()
-                
+                val tickLen = if (isBig) 11.dp.toPx() else 5.dp.toPx()
                 drawLine(
-                    color = tickColor,
-                    start = Offset(inX, inY),
-                    end = Offset(outX, outY),
-                    strokeWidth = tickWidth,
+                    color = if (isBig) CText.copy(alpha = 0.55f) else CMuted.copy(alpha = 0.38f),
+                    start = Offset(
+                        centerOffset.x + (tickRadiusOut - tickLen) * cos,
+                        centerOffset.y + (tickRadiusOut - tickLen) * sin
+                    ),
+                    end = Offset(centerOffset.x + tickRadiusOut * cos, centerOffset.y + tickRadiusOut * sin),
+                    strokeWidth = if (isBig) 2.4.dp.toPx() else 1.4.dp.toPx(),
                     cap = StrokeCap.Round
                 )
-                
                 if (isBig) {
-                    val text = (i / 5).toString()
-                    val tX = centerOffset.x + textRadius * kotlin.math.cos(angleRad).toFloat()
-                    val tY = centerOffset.y + textRadius * kotlin.math.sin(angleRad).toFloat() - (textPaint.ascent() + textPaint.descent()) / 2
-                    drawContext.canvas.nativeCanvas.drawText(text, tX, tY, textPaint)
+                    val tx = centerOffset.x + textRadius * cos
+                    val ty = centerOffset.y + textRadius * sin - (textPaint.ascent() + textPaint.descent()) / 2
+                    drawContext.canvas.nativeCanvas.drawText((i / 5).toString(), tx, ty, textPaint)
                 }
             }
-            
-            // Acul
-            val currentFraction = animatedPower / 7000f
-            val needleAngle = startAngle + currentFraction * sweepAngle
-            val needleAngleRad = Math.toRadians(needleAngle.toDouble())
-            
-            val needleLen = radius * 0.72f
-            val baseRadius = 5.dp.toPx()
-            
-            val nTipX = centerOffset.x + needleLen * kotlin.math.cos(needleAngleRad).toFloat()
-            val nTipY = centerOffset.y + needleLen * kotlin.math.sin(needleAngleRad).toFloat()
-            
-            val nLeftAngle = needleAngleRad - Math.PI / 2
-            val nLeftX = centerOffset.x + baseRadius * kotlin.math.cos(nLeftAngle).toFloat()
-            val nLeftY = centerOffset.y + baseRadius * kotlin.math.sin(nLeftAngle).toFloat()
-            
-            val nRightAngle = needleAngleRad + Math.PI / 2
-            val nRightX = centerOffset.x + baseRadius * kotlin.math.cos(nRightAngle).toFloat()
-            val nRightY = centerOffset.y + baseRadius * kotlin.math.sin(nRightAngle).toFloat()
-            
-            val needlePath = Path().apply {
-                moveTo(nTipX, nTipY)
-                lineTo(nLeftX, nLeftY)
-                lineTo(nRightX, nRightY)
-                close()
+
+            // Acul: umbra intai, apoi acul cu gradient, ca sa para ridicat de pe cadran.
+            val needleRad = Math.toRadians(angleOf(animatedPower).toDouble())
+            val nCos = kotlin.math.cos(needleRad).toFloat()
+            val nSin = kotlin.math.sin(needleRad).toFloat()
+            val needleLen = radius * 0.70f
+            val baseHalf = 5.5.dp.toPx()
+
+            fun needlePath(shift: Offset): Path {
+                val c = centerOffset + shift
+                val tip = Offset(c.x + needleLen * nCos, c.y + needleLen * nSin)
+                val left = Offset(c.x + baseHalf * (-nSin), c.y + baseHalf * nCos)
+                val right = Offset(c.x - baseHalf * (-nSin), c.y - baseHalf * nCos)
+                return Path().apply {
+                    moveTo(tip.x, tip.y)
+                    lineTo(left.x, left.y)
+                    lineTo(right.x, right.y)
+                    close()
+                }
             }
-            
-            drawPath(path = needlePath, color = CHouse)
-            
-            drawCircle(color = CHouse, radius = 9.dp.toPx(), center = centerOffset)
-            drawCircle(color = CPanelRaised, radius = 3.5.dp.toPx(), center = centerOffset)
+
+            drawPath(needlePath(Offset(2.dp.toPx(), 3.dp.toPx())), color = Color(0xFF16324F).copy(alpha = 0.22f))
+            drawPath(
+                path = needlePath(Offset.Zero),
+                brush = Brush.linearGradient(
+                    colors = listOf(Color(0xFF2F93FF), CHouse, Color(0xFF0A4FA5)),
+                    start = Offset(centerOffset.x - baseHalf * 2, centerOffset.y - baseHalf * 2),
+                    end = Offset(centerOffset.x + needleLen * nCos, centerOffset.y + needleLen * nSin)
+                )
+            )
+
+            // Butucul central, tot cu umbra si gradient.
+            drawCircle(
+                color = Color(0xFF16324F).copy(alpha = 0.20f),
+                radius = 10.dp.toPx(),
+                center = centerOffset + Offset(1.5.dp.toPx(), 2.5.dp.toPx())
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF57ABFF), CHouse, Color(0xFF0A4FA5)),
+                    center = centerOffset - Offset(3.dp.toPx(), 3.dp.toPx()),
+                    radius = 14.dp.toPx()
+                ),
+                radius = 9.5.dp.toPx(),
+                center = centerOffset
+            )
+            drawCircle(color = CPanelRaised, radius = 3.4.dp.toPx(), center = centerOffset)
         }
-        
+
+        // Valoarea sta in golul de jos al arcului, sub butuc.
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = gaugeRadius * 0.54f),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = powerW.roundToInt().toString(),
                     color = CText,
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 36.sp,
+                    fontWeight = FontWeight.Bold,
+                    style = LocalTextStyle.current.copy(
+                        shadow = Shadow(
+                            color = Color(0xFF16324F).copy(alpha = 0.30f),
+                            offset = Offset(0f, 3f),
+                            blurRadius = 6f
+                        )
+                    )
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
@@ -1027,7 +1061,7 @@ private fun SimpleGauge(
                     color = CHouse,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 6.dp)
+                    modifier = Modifier.padding(bottom = 5.dp)
                 )
             }
         }
@@ -1037,7 +1071,6 @@ private fun SimpleGauge(
 @Composable
 private fun SimpleDashboard(
     data: SolarData?,
-    alarmThresholdW: Int,
     selectedTab: RetroTab,
     onTabSelected: (RetroTab) -> Unit,
     onHistoryFieldClick: (HistoryMetric) -> Unit,
@@ -1111,26 +1144,16 @@ private fun SimpleDashboard(
                                     color = CPanel,
                                     tonalElevation = 2.dp
                                 ) {
-                                    Column(Modifier.padding(12.dp)) {
-                                        SimpleCardHeader(R.drawable.ic_simple_tab_dashboard, "CONSUM CASĂ")
+                                    // Panourile stau in acelasi card cu cadranul: consumul si
+                                    // productia se citesc dintr-o privire, si castigam un card.
+                                    Column(Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp)) {
                                         SimpleGauge(
                                             powerW = data?.house ?: 0.0,
-                                            alarmThresholdW = alarmThresholdW,
-                                            modifier = Modifier.fillMaxWidth().height(176.dp)
+                                            modifier = Modifier.fillMaxWidth().height(238.dp)
                                         )
-                                    }
-                                }
-
-                                // 3. Card PANOURI
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = CPanel,
-                                    tonalElevation = 1.dp
-                                ) {
-                                    Column(Modifier.padding(12.dp)) {
-                                        SimpleCardHeader(R.drawable.ic_simple_panel, "PANOURI")
-                                        Spacer(Modifier.height(8.dp))
+                                        Spacer(Modifier.height(4.dp))
+                                        HorizontalDivider(color = CLine.copy(alpha = 0.55f))
+                                        Spacer(Modifier.height(10.dp))
                                         Row(Modifier.fillMaxWidth()) {
                                             val pv1 = data?.pv1?.roundToInt() ?: 0
                                             val pv2 = data?.pv2?.roundToInt() ?: 0
@@ -1157,19 +1180,19 @@ private fun SimpleDashboard(
                                     }
                                 }
 
-                                // 4. Card FLUX ENERGETIC
+                                // 3. Card FLUX ENERGETIC. Fara titlu: spatiul castigat merge in
+                                // inaltimea diagramei, ca panoul sa stea vizibil mai sus decat
+                                // casa si sa se citeasca sensul curgerii.
                                 Surface(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(16.dp),
                                     color = CPanel,
                                     tonalElevation = 1.dp
                                 ) {
-                                    Column(Modifier.padding(12.dp)) {
-                                        SimpleCardHeader(R.drawable.ic_simple_flow, "FLUX ENERGETIC")
-                                        Spacer(Modifier.height(4.dp))
+                                    Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                                         EnergyFlow(
                                             data = data,
-                                            modifier = Modifier.height(200.dp),
+                                            modifier = Modifier.height(268.dp),
                                             onHistoryClick = onHistoryFieldClick
                                         )
                                     }
@@ -1293,41 +1316,6 @@ private fun Header() {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-    }
-}
-
-@Composable
-private fun EnergyOverview(data: SolarData?, onHistoryClick: (HistoryMetric) -> Unit) {
-    val source = sourceLabel(data)
-    val sourceStatus = if (data == null) "Se conecteaza" else "Casa din $source"
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = CPanel,
-        tonalElevation = 2.dp,
-        shadowElevation = 1.dp
-    ) {
-        Column(Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("Acum", color = CText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                    Text("Flux energetic live", color = CMuted, fontSize = 11.sp)
-                }
-                StatusPill(label = sourceStatus, color = sourceColor(data))
-            }
-
-            Spacer(Modifier.height(14.dp))
-            EnergyFlow(data = data, modifier = Modifier.height(272.dp), onHistoryClick = onHistoryClick)
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = CLine.copy(alpha = 0.65f))
-            Spacer(Modifier.height(14.dp))
-            DailySummary(data = data, onHistoryClick = onHistoryClick)
-        }
     }
 }
 
@@ -1511,55 +1499,6 @@ private fun FlowIllustration(
 }
 
 @Composable
-private fun EnergyNode(
-    modifier: Modifier,
-    label: String,
-    number: String,
-    unit: String,
-    supporting: String,
-    color: Color,
-    prominent: Boolean = false,
-    onClick: (() -> Unit)? = null
-) {
-    val clickModifier = if (onClick == null) Modifier else Modifier.clickable(onClick = onClick)
-    Surface(
-        modifier = modifier
-            .heightIn(min = if (prominent) 94.dp else 86.dp)
-            .then(clickModifier),
-        shape = RoundedCornerShape(if (prominent) 20.dp else 17.dp),
-        color = if (prominent) CPanelRaised else CPanelSoft,
-        tonalElevation = if (prominent) 4.dp else 1.dp,
-        shadowElevation = if (prominent) 2.dp else 0.dp
-    ) {
-        Column(
-            Modifier.padding(horizontal = if (prominent) 12.dp else 9.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(6.dp).clip(CircleShape).background(color))
-                Spacer(Modifier.width(6.dp))
-                Text(label, color = CMuted, fontSize = 11.sp, maxLines = 1)
-                if (onClick != null) {
-                    Spacer(Modifier.width(5.dp))
-                    TrendGlyph(Modifier.size(12.dp), color.copy(alpha = 0.8f))
-                }
-            }
-            Spacer(Modifier.height(4.dp))
-            MeasurementText(number = number, unit = unit, color = color, prominent = prominent)
-            Spacer(Modifier.height(3.dp))
-            Text(
-                supporting,
-                color = CMuted,
-                fontSize = if (prominent) 10.sp else 9.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
 private fun MeasurementText(number: String, unit: String, color: Color, prominent: Boolean = false) {
     Text(
         text = buildAnnotatedString {
@@ -1581,33 +1520,6 @@ private fun MeasurementText(number: String, unit: String, color: Color, prominen
         },
         maxLines = 1
     )
-}
-
-@Composable
-private fun DailySummary(data: SolarData?, onHistoryClick: (HistoryMetric) -> Unit) {
-    Column {
-        Text("Astazi", color = CText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            DailyMetric(
-                modifier = Modifier.weight(1f),
-                label = "Produs",
-                number = decimalNumber(data?.energyPvToday, 1),
-                total = data?.let { "total ${it.energyPvTotal.roundToInt()} kWh" } ?: "astept date",
-                color = CPv,
-                onClick = { onHistoryClick(historyMetric("energy_pv_today")) }
-            )
-            Box(Modifier.width(1.dp).height(52.dp).background(CLine.copy(alpha = 0.75f)))
-            DailyMetric(
-                modifier = Modifier.weight(1f),
-                label = "Consum",
-                number = decimalNumber(data?.energyLoadToday, 1),
-                total = data?.let { "total ${it.energyLoadTotal.roundToInt()} kWh" } ?: "astept date",
-                color = CHouse,
-                onClick = { onHistoryClick(historyMetric("energy_load_today")) }
-            )
-        }
-    }
 }
 
 @Composable
