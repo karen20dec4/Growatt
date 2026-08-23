@@ -70,6 +70,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.Icon
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -382,6 +386,7 @@ fun App() {
             )
             DashboardStyle.SIMPLE -> SimpleDashboard(
                 data = data,
+                alarmThresholdW = alarmSettings.thresholdW,
                 selectedTab = RetroTab.valueOf(retroTabName),
                 onTabSelected = { tab -> retroTabName = tab.name },
                 onHistoryFieldClick = { 
@@ -845,9 +850,194 @@ private fun RetroMetricButton(
     }
 }
 
+
+@Composable
+private fun SimpleCardHeader(iconRes: Int, title: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(CHouse.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = iconRes),
+                contentDescription = null,
+                tint = CHouse,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = title,
+            color = CText,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+private fun SimpleGauge(
+    powerW: Double,
+    alarmThresholdW: Int,
+    modifier: Modifier = Modifier
+) {
+    val animatedPower by animateFloatAsState(
+        targetValue = powerW.toFloat().coerceIn(0f, 7000f),
+        animationSpec = tween(700),
+        label = "GaugeAngle"
+    )
+    val startAngle = 150f
+    val sweepAngle = 240f
+    
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "Consum casa ${powerW.roundToInt()} wati din maximum 7000" },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            // Arcul merge de la 150 grade, peste varf, pana la 30 de grade. Punctele lui cele
+            // mai de jos sunt la +0.5R fata de centru, deci desenul ocupa 2R pe latime si
+            // 1.5R pe inaltime. Raza trebuie limitata de ambele, altfel cadranul se taie.
+            val pad = 12.dp.toPx()
+            val radius = kotlin.math.min(size.width / 2f, size.height / 1.5f) - pad
+            val centerOffset = Offset(size.width / 2f, radius + pad)
+            
+            // 1. Pista
+            drawArc(
+                color = CHouse.copy(alpha = 0.16f),
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = false,
+                style = Stroke(width = 11.dp.toPx(), cap = StrokeCap.Round),
+                topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
+                size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+            )
+            
+            // 2. Zona de avertizare
+            val alarmStartValue = alarmThresholdW.toFloat().coerceIn(0f, 7000f)
+            if (alarmStartValue < 7000f) {
+                val alarmStartAngle = startAngle + (alarmStartValue / 7000f) * sweepAngle
+                val alarmSweepAngle = sweepAngle - (alarmStartValue / 7000f) * sweepAngle
+                drawArc(
+                    color = CBat,
+                    startAngle = alarmStartAngle,
+                    sweepAngle = alarmSweepAngle,
+                    useCenter = false,
+                    style = Stroke(width = 11.dp.toPx(), cap = StrokeCap.Round),
+                    topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
+                    size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+                )
+            }
+            
+            // 3. Gradatii
+            val tickRadiusOut = radius - 16.dp.toPx()
+            val textRadius = radius - 36.dp.toPx()
+            val numBigTicks = 7
+            val totalTicks = numBigTicks * 5
+            
+            val textPaint = Paint().apply {
+                color = CMuted.toArgb()
+                textSize = 13.sp.toPx()
+                textAlign = Paint.Align.CENTER
+            }
+            
+            for (i in 0..totalTicks) {
+                val fraction = i.toFloat() / totalTicks
+                val angle = startAngle + fraction * sweepAngle
+                val angleRad = Math.toRadians(angle.toDouble())
+                
+                val isBig = i % 5 == 0
+                val tickLen = if (isBig) 10.dp.toPx() else 5.dp.toPx()
+                val tickWidth = if (isBig) 2.dp.toPx() else 1.5.dp.toPx()
+                val tickColor = if (isBig) CMuted.copy(alpha = 0.75f) else CMuted.copy(alpha = 0.40f)
+                
+                val outX = centerOffset.x + tickRadiusOut * kotlin.math.cos(angleRad).toFloat()
+                val outY = centerOffset.y + tickRadiusOut * kotlin.math.sin(angleRad).toFloat()
+                val inX = centerOffset.x + (tickRadiusOut - tickLen) * kotlin.math.cos(angleRad).toFloat()
+                val inY = centerOffset.y + (tickRadiusOut - tickLen) * kotlin.math.sin(angleRad).toFloat()
+                
+                drawLine(
+                    color = tickColor,
+                    start = Offset(inX, inY),
+                    end = Offset(outX, outY),
+                    strokeWidth = tickWidth,
+                    cap = StrokeCap.Round
+                )
+                
+                if (isBig) {
+                    val text = (i / 5).toString()
+                    val tX = centerOffset.x + textRadius * kotlin.math.cos(angleRad).toFloat()
+                    val tY = centerOffset.y + textRadius * kotlin.math.sin(angleRad).toFloat() - (textPaint.ascent() + textPaint.descent()) / 2
+                    drawContext.canvas.nativeCanvas.drawText(text, tX, tY, textPaint)
+                }
+            }
+            
+            // Acul
+            val currentFraction = animatedPower / 7000f
+            val needleAngle = startAngle + currentFraction * sweepAngle
+            val needleAngleRad = Math.toRadians(needleAngle.toDouble())
+            
+            val needleLen = radius * 0.72f
+            val baseRadius = 5.dp.toPx()
+            
+            val nTipX = centerOffset.x + needleLen * kotlin.math.cos(needleAngleRad).toFloat()
+            val nTipY = centerOffset.y + needleLen * kotlin.math.sin(needleAngleRad).toFloat()
+            
+            val nLeftAngle = needleAngleRad - Math.PI / 2
+            val nLeftX = centerOffset.x + baseRadius * kotlin.math.cos(nLeftAngle).toFloat()
+            val nLeftY = centerOffset.y + baseRadius * kotlin.math.sin(nLeftAngle).toFloat()
+            
+            val nRightAngle = needleAngleRad + Math.PI / 2
+            val nRightX = centerOffset.x + baseRadius * kotlin.math.cos(nRightAngle).toFloat()
+            val nRightY = centerOffset.y + baseRadius * kotlin.math.sin(nRightAngle).toFloat()
+            
+            val needlePath = Path().apply {
+                moveTo(nTipX, nTipY)
+                lineTo(nLeftX, nLeftY)
+                lineTo(nRightX, nRightY)
+                close()
+            }
+            
+            drawPath(path = needlePath, color = CHouse)
+            
+            drawCircle(color = CHouse, radius = 9.dp.toPx(), center = centerOffset)
+            drawCircle(color = CPanelRaised, radius = 3.5.dp.toPx(), center = centerOffset)
+        }
+        
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = powerW.roundToInt().toString(),
+                    color = CText,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "W",
+                    color = CHouse,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun SimpleDashboard(
     data: SolarData?,
+    alarmThresholdW: Int,
     selectedTab: RetroTab,
     onTabSelected: (RetroTab) -> Unit,
     onHistoryFieldClick: (HistoryMetric) -> Unit,
@@ -893,11 +1083,140 @@ private fun SimpleDashboard(
                     when (visibleTab) {
                         RetroTab.DASHBOARD -> {
                             Column(
-                                Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Header()
-                                EnergyOverview(data = data, onHistoryClick = onHistoryFieldClick)
+                                // 1. Rand de antet compact
+                                Row(
+                                    Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(bottom = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val context = LocalContext.current
+                                    Text(
+                                        text = "V${appVersion(context)}",
+                                        color = CMuted,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    val source = sourceLabel(data)
+                                    val sourceStatus = if (data == null) "SE CONECTEAZA" else "CASA DIN ${source.uppercase(Locale.getDefault())}"
+                                    StatusPill(label = sourceStatus, color = sourceColor(data))
+                                }
+
+                                // 2. Card CONSUM CASA
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = CPanel,
+                                    tonalElevation = 2.dp
+                                ) {
+                                    Column(Modifier.padding(12.dp)) {
+                                        SimpleCardHeader(R.drawable.ic_simple_tab_dashboard, "CONSUM CASĂ")
+                                        SimpleGauge(
+                                            powerW = data?.house ?: 0.0,
+                                            alarmThresholdW = alarmThresholdW,
+                                            modifier = Modifier.fillMaxWidth().height(176.dp)
+                                        )
+                                    }
+                                }
+
+                                // 3. Card PANOURI
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = CPanel,
+                                    tonalElevation = 1.dp
+                                ) {
+                                    Column(Modifier.padding(12.dp)) {
+                                        SimpleCardHeader(R.drawable.ic_simple_panel, "PANOURI")
+                                        Spacer(Modifier.height(8.dp))
+                                        Row(Modifier.fillMaxWidth()) {
+                                            val pv1 = data?.pv1?.roundToInt() ?: 0
+                                            val pv2 = data?.pv2?.roundToInt() ?: 0
+                                            val pvTotal = data?.pv?.roundToInt() ?: 0
+                                            
+                                            @Composable
+                                            fun PvCol(label: String, value: Int, modifier: Modifier) {
+                                                Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text(label, color = CMuted, fontSize = 10.sp)
+                                                    Spacer(Modifier.height(2.dp))
+                                                    Row(verticalAlignment = Alignment.Bottom) {
+                                                        Text(value.toString(), color = CHouse, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                                                        Text(" W", color = CMuted, fontSize = 10.sp, modifier = Modifier.padding(bottom = 2.dp))
+                                                    }
+                                                }
+                                            }
+                                            
+                                            PvCol("PV1", pv1, Modifier.weight(1f))
+                                            Box(Modifier.width(1.dp).height(32.dp).background(CLine.copy(alpha = 0.5f)))
+                                            PvCol("PV2", pv2, Modifier.weight(1f))
+                                            Box(Modifier.width(1.dp).height(32.dp).background(CLine.copy(alpha = 0.5f)))
+                                            PvCol("TOTAL", pvTotal, Modifier.weight(1f))
+                                        }
+                                    }
+                                }
+
+                                // 4. Card FLUX ENERGETIC
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = CPanel,
+                                    tonalElevation = 1.dp
+                                ) {
+                                    Column(Modifier.padding(12.dp)) {
+                                        SimpleCardHeader(R.drawable.ic_simple_flow, "FLUX ENERGETIC")
+                                        Spacer(Modifier.height(4.dp))
+                                        EnergyFlow(
+                                            data = data,
+                                            modifier = Modifier.height(200.dp),
+                                            onHistoryClick = onHistoryFieldClick
+                                        )
+                                    }
+                                }
+
+                                // 5. Rand cu trei carduri mici
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    @Composable
+                                    fun SmallCard(iconRes: Int, label: String, value: String, unit: String, valColor: Color, modifier: Modifier) {
+                                        Surface(
+                                            modifier = modifier.height(64.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = CPanel,
+                                            tonalElevation = 1.dp
+                                        ) {
+                                            Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Box(
+                                                        Modifier.size(20.dp).clip(CircleShape).background(CHouse.copy(alpha = 0.08f)),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Icon(
+                                                            painter = painterResource(id = iconRes),
+                                                            contentDescription = null,
+                                                            tint = CHouse.copy(alpha = 0.7f),
+                                                            modifier = Modifier.size(12.dp)
+                                                        )
+                                                    }
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Text(label, color = CMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                }
+                                                Row(verticalAlignment = Alignment.Bottom) {
+                                                    Text(value, color = valColor, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                                    Text(" $unit", color = CMuted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 1.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    val batV = data?.let { String.format(Locale.US, "%.1f", it.batteryVoltage) } ?: "0.0"
+                                    val invW = data?.inverterLoss?.roundToInt()?.toString() ?: "0"
+                                    val tempC = data?.let { String.format(Locale.US, "%.1f", it.inverterTemp) } ?: "0.0"
+                                    
+                                    SmallCard(R.drawable.ic_simple_battery, "Bat", batV, "V", CHouse, Modifier.weight(1f))
+                                    SmallCard(R.drawable.ic_simple_inverter, "Inv", invW, "W", CHouse, Modifier.weight(1f))
+                                    SmallCard(R.drawable.ic_simple_thermo, "Temp", tempC, "°C", CBat, Modifier.weight(1.2f))
+                                }
                             }
                         }
                         RetroTab.ENERGY -> energyContent()
@@ -1003,7 +1322,7 @@ private fun EnergyOverview(data: SolarData?, onHistoryClick: (HistoryMetric) -> 
             }
 
             Spacer(Modifier.height(14.dp))
-            EnergyFlow(data = data, onHistoryClick = onHistoryClick)
+            EnergyFlow(data = data, modifier = Modifier.height(272.dp), onHistoryClick = onHistoryClick)
             Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = CLine.copy(alpha = 0.65f))
             Spacer(Modifier.height(14.dp))
@@ -1028,7 +1347,7 @@ private fun StatusPill(label: String, color: Color) {
 }
 
 @Composable
-private fun EnergyFlow(data: SolarData?, onHistoryClick: (HistoryMetric) -> Unit) {
+private fun EnergyFlow(data: SolarData?, modifier: Modifier = Modifier, onHistoryClick: (HistoryMetric) -> Unit) {
     val pv = data?.pv ?: 0.0
     val battery = data?.batteryDisplay ?: 0.0
     val batteryCharge = data?.batteryCharge ?: 0.0
@@ -1047,17 +1366,38 @@ private fun EnergyFlow(data: SolarData?, onHistoryClick: (HistoryMetric) -> Unit
     )
 
     Box(
-        Modifier
-            .fillMaxWidth()
-            .height(272.dp)
+        modifier.fillMaxWidth()
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            val solar = Offset(50.dp.toPx(), 43.dp.toPx())
-            val batteryNode = Offset(50.dp.toPx(), size.height - 43.dp.toPx())
-            val house = Offset(size.width / 2f, size.height / 2f)
-            val gridNode = Offset(size.width - 40.dp.toPx(), size.height / 2f)
+            // Asezare ca in referinta: panoul sus la mijloc, casa jos la mijloc, bateria in
+            // stanga ei, stalpul in dreapta. Coordonatele trebuie sa cada peste centrele
+            // ilustratiilor de mai jos, altfel liniile pornesc de nicaieri.
+            val sideInset = 58.dp.toPx()
+            val bottomRow = size.height - 53.dp.toPx()
+            val solar = Offset(size.width / 2f, 29.dp.toPx())
+            val house = Offset(size.width / 2f, bottomRow)
+            val batteryNode = Offset(sideInset, bottomRow)
+            val gridNode = Offset(size.width - sideInset, bottomRow)
 
-            fun connection(start: Offset, end: Offset, active: Boolean, color: Color) {
+            // Liniile se scurteaza la ambele capete ca sa nu intre peste ilustratii. Capetele
+            // au decupaje diferite: pe verticala nodul ocupa si randul de valoare de sub poza,
+            // pe orizontala doar latimea pozei.
+            fun connection(
+                rawStart: Offset,
+                rawEnd: Offset,
+                active: Boolean,
+                color: Color,
+                startGap: Float = 40.dp.toPx(),
+                endGap: Float = 40.dp.toPx()
+            ) {
+                val dx = rawEnd.x - rawStart.x
+                val dy = rawEnd.y - rawStart.y
+                val len = kotlin.math.hypot(dx, dy)
+                if (len <= startGap + endGap) return
+                val ux = dx / len
+                val uy = dy / len
+                val start = Offset(rawStart.x + ux * startGap, rawStart.y + uy * startGap)
+                val end = Offset(rawEnd.x - ux * endGap, rawEnd.y - uy * endGap)
                 drawLine(
                     color = CLine.copy(alpha = 0.85f),
                     start = start,
@@ -1084,48 +1424,89 @@ private fun EnergyFlow(data: SolarData?, onHistoryClick: (HistoryMetric) -> Unit
                 }
             }
 
-            connection(solar, house, active = pv > DEAD, color = CPv)
-            connection(solar, batteryNode, active = charging, color = CPv)
-            connection(batteryNode, house, active = discharging, color = CBat)
-            connection(gridNode, house, active = grid > DEAD, color = CGrid)
+            // Capatul de sus trece pe langa poza SI pe langa valoarea de sub ea.
+            connection(
+                solar, house, active = pv > DEAD, color = CPv,
+                startGap = 60.dp.toPx(), endGap = 36.dp.toPx()
+            )
+            connection(
+                batteryNode, house,
+                active = discharging || charging,
+                color = if (charging) CPv else CBat,
+                startGap = 36.dp.toPx(), endGap = 36.dp.toPx()
+            )
+            connection(
+                gridNode, house, active = grid > DEAD, color = CGrid,
+                startGap = 36.dp.toPx(), endGap = 36.dp.toPx()
+            )
         }
 
-        EnergyNode(
-            modifier = Modifier.align(Alignment.TopStart).width(100.dp),
-            label = "Panouri",
-            number = wholeNumber(data?.pv),
-            unit = "W",
-            supporting = data?.let { "PV1 ${it.pv1.roundToInt()} · PV2 ${it.pv2.roundToInt()}" } ?: "astept date",
+        FlowIllustration(
+            modifier = Modifier.align(Alignment.TopCenter),
+            imageRes = R.drawable.simple_flow_panou,
+            description = "Panouri",
+            value = wholeNumber(data?.pv),
             color = CPv,
             onClick = { onHistoryClick(historyMetric("pv_power")) }
         )
-        EnergyNode(
-            modifier = Modifier.align(Alignment.BottomStart).width(100.dp),
-            label = "Baterie",
-            number = signedNumber(data?.batteryDisplay),
-            unit = "W",
-            supporting = data?.let { String.format(Locale.US, "%.2f V", it.batteryVoltage) } ?: "astept date",
+        FlowIllustration(
+            modifier = Modifier.align(Alignment.BottomStart),
+            imageRes = R.drawable.simple_flow_baterie,
+            description = "Baterie",
+            value = signedNumber(data?.batteryDisplay),
             color = data?.let { batteryColor(it.batteryVoltage) } ?: CMuted,
             onClick = { onHistoryClick(historyMetric("battery_voltage")) }
         )
-        EnergyNode(
-            modifier = Modifier.align(Alignment.Center).width(116.dp),
-            label = "Casa",
-            number = wholeNumber(data?.house),
-            unit = "W",
-            supporting = data?.let { "sarcina ${it.loadPercent.roundToInt()}%" } ?: "astept date",
+        FlowIllustration(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            imageRes = R.drawable.simple_flow_casa,
+            description = "Casa",
+            value = wholeNumber(data?.house),
             color = CHouse,
-            prominent = true,
             onClick = { onHistoryClick(historyMetric("output_power")) }
         )
-        EnergyNode(
-            modifier = Modifier.align(Alignment.CenterEnd).width(80.dp),
-            label = "Retea",
-            number = wholeNumber(if (data == null) null else grid),
-            unit = "W",
-            supporting = data?.let { String.format(Locale.US, "%.1f V", it.gridVoltage) } ?: "astept",
+        FlowIllustration(
+            modifier = Modifier.align(Alignment.BottomEnd),
+            imageRes = R.drawable.simple_flow_stalp,
+            description = "Retea",
+            value = wholeNumber(if (data == null) null else grid),
             color = CGrid
         )
+    }
+}
+
+/**
+ * Un nod din diagrama de flux: ilustratia 3D si valoarea de sub ea.
+ * Ilustratiile sunt decorative si au `contentDescription = null`; descrierea utila
+ * sta pe intreg nodul, impreuna cu valoarea, ca cititorul de ecran sa o citeasca o data.
+ */
+@Composable
+private fun FlowIllustration(
+    modifier: Modifier,
+    imageRes: Int,
+    description: String,
+    value: String,
+    color: Color,
+    onClick: (() -> Unit)? = null
+) {
+    val clickModifier = if (onClick == null) Modifier else Modifier.clickable(onClick = onClick)
+    Column(
+        modifier = modifier
+            .width(100.dp)
+            .then(clickModifier)
+            .semantics { contentDescription = "$description $value wati" },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Image(
+            painter = painterResource(imageRes),
+            contentDescription = null,
+            modifier = Modifier.size(58.dp)
+        )
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(value, color = color, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Spacer(Modifier.width(2.dp))
+            Text("W", color = CMuted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 2.dp))
+        }
     }
 }
 
