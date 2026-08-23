@@ -80,6 +80,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -145,6 +146,13 @@ private const val GAUGE_MAX_W = 7000f
 private const val GAUGE_WARN_W = 5500f
 private const val GAUGE_DANGER_W = 6000f
 private val CGaugeWarn = Color(0xFFE9B209)   // galben avertizare
+
+// Umbra folosita pe toate valorile mari din tema Simple: le ridica de pe card.
+private val ValueShadow = Shadow(
+    color = Color(0xFF16324F).copy(alpha = 0.30f),
+    offset = Offset(0f, 3f),
+    blurRadius = 7f
+)
 
 private data class DashboardChrome(
     val background: Color,
@@ -862,6 +870,90 @@ private fun RetroMetricButton(
     }
 }
 
+/**
+ * O citire "gravata" in placa: adancitura are umbra sus si lumina jos, iar cifra e desenata
+ * de doua ori - o copie deschisa decalata in jos-dreapta, apoi textul propriu-zis peste ea.
+ * Asa arata sapat in material, nu lipit deasupra.
+ */
+@Composable
+private fun EngravedReadout(
+    iconRes: Int,
+    label: String,
+    value: String,
+    unit: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(74.dp)
+            .semantics { contentDescription = "$label $value $unit" }
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val corner = CornerRadius(13.dp.toPx())
+            // Fundul adanciturii, cu un gradient care il face sa para scobit.
+            drawRoundRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFFD5DDE7), Color(0xFFE9EEF4), Color(0xFFF2F6FA))
+                ),
+                cornerRadius = corner
+            )
+            // Muchia de sus e in umbra, cea de jos prinde lumina: asta face adancitura.
+            drawRoundRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF63758A).copy(alpha = 0.70f),
+                        Color(0xFF63758A).copy(alpha = 0.06f),
+                        Color.White
+                    )
+                ),
+                cornerRadius = corner,
+                style = Stroke(width = 3.5.dp.toPx())
+            )
+        }
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 7.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = null,
+                    tint = CMuted.copy(alpha = 0.75f),
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    label,
+                    color = CMuted.copy(alpha = 0.85f),
+                    fontSize = 9.sp,
+                    letterSpacing = 0.8.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(verticalAlignment = Alignment.Bottom) {
+                Box {
+                    Text(
+                        value,
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.offset(x = 1.dp, y = 1.5.dp)
+                    )
+                    Text(value, color = valueColor, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                }
+                Text(
+                    " $unit",
+                    color = CMuted,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun SimpleGauge(
     powerW: Double,
@@ -1045,23 +1137,17 @@ private fun SimpleGauge(
                 Text(
                     text = powerW.roundToInt().toString(),
                     color = CText,
-                    fontSize = 36.sp,
+                    fontSize = 46.sp,
                     fontWeight = FontWeight.Bold,
-                    style = LocalTextStyle.current.copy(
-                        shadow = Shadow(
-                            color = Color(0xFF16324F).copy(alpha = 0.30f),
-                            offset = Offset(0f, 3f),
-                            blurRadius = 6f
-                        )
-                    )
+                    style = LocalTextStyle.current.copy(shadow = ValueShadow)
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
                     text = "W",
                     color = CHouse,
-                    fontSize = 16.sp,
+                    fontSize = 21.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 5.dp)
+                    modifier = Modifier.padding(bottom = 7.dp)
                 )
             }
         }
@@ -1165,8 +1251,14 @@ private fun SimpleDashboard(
                                                     Text(label, color = CMuted, fontSize = 10.sp)
                                                     Spacer(Modifier.height(2.dp))
                                                     Row(verticalAlignment = Alignment.Bottom) {
-                                                        Text(value.toString(), color = CHouse, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                                                        Text(" W", color = CMuted, fontSize = 10.sp, modifier = Modifier.padding(bottom = 2.dp))
+                                                        Text(
+                                                            value.toString(),
+                                                            color = CHouse,
+                                                            fontSize = 23.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            style = LocalTextStyle.current.copy(shadow = ValueShadow)
+                                                        )
+                                                        Text(" W", color = CMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 3.dp))
                                                     }
                                                 }
                                             }
@@ -1192,53 +1284,32 @@ private fun SimpleDashboard(
                                     Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                                         EnergyFlow(
                                             data = data,
-                                            modifier = Modifier.height(268.dp),
+                                            modifier = Modifier.height(226.dp),
                                             onHistoryClick = onHistoryFieldClick
                                         )
                                     }
                                 }
 
-                                // 5. Rand cu trei carduri mici
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    @Composable
-                                    fun SmallCard(iconRes: Int, label: String, value: String, unit: String, valColor: Color, modifier: Modifier) {
-                                        Surface(
-                                            modifier = modifier.height(64.dp),
-                                            shape = RoundedCornerShape(12.dp),
-                                            color = CPanel,
-                                            tonalElevation = 1.dp
-                                        ) {
-                                            Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Box(
-                                                        Modifier.size(20.dp).clip(CircleShape).background(CHouse.copy(alpha = 0.08f)),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Icon(
-                                                            painter = painterResource(id = iconRes),
-                                                            contentDescription = null,
-                                                            tint = CHouse.copy(alpha = 0.7f),
-                                                            modifier = Modifier.size(12.dp)
-                                                        )
-                                                    }
-                                                    Spacer(Modifier.width(4.dp))
-                                                    Text(label, color = CMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                }
-                                                Row(verticalAlignment = Alignment.Bottom) {
-                                                    Text(value, color = valColor, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                                    Text(" $unit", color = CMuted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 1.dp))
-                                                }
-                                            }
-                                        }
+                                // 4. Trei citiri gravate: baterie, autoconsum invertor,
+                                // temperatura invertor - acelasi set ca pe TABLOU-ul Retro.
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = CPanel,
+                                    tonalElevation = 1.dp
+                                ) {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(10.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        val batV = data?.let { String.format(Locale.US, "%.1f", it.batteryVoltage) } ?: "--"
+                                        val invW = data?.inverterLoss?.roundToInt()?.toString() ?: "--"
+                                        val tempC = data?.let { String.format(Locale.US, "%.1f", it.inverterTemp) } ?: "--"
+
+                                        EngravedReadout(R.drawable.ic_simple_battery, "BATERIE", batV, "V", CHouse, Modifier.weight(1f))
+                                        EngravedReadout(R.drawable.ic_simple_inverter, "INVERTOR", invW, "W", CHouse, Modifier.weight(1f))
+                                        EngravedReadout(R.drawable.ic_simple_thermo, "TEMP", tempC, "°C", CBat, Modifier.weight(1f))
                                     }
-                                    
-                                    val batV = data?.let { String.format(Locale.US, "%.1f", it.batteryVoltage) } ?: "0.0"
-                                    val invW = data?.inverterLoss?.roundToInt()?.toString() ?: "0"
-                                    val tempC = data?.let { String.format(Locale.US, "%.1f", it.inverterTemp) } ?: "0.0"
-                                    
-                                    SmallCard(R.drawable.ic_simple_battery, "Bat", batV, "V", CHouse, Modifier.weight(1f))
-                                    SmallCard(R.drawable.ic_simple_inverter, "Inv", invW, "W", CHouse, Modifier.weight(1f))
-                                    SmallCard(R.drawable.ic_simple_thermo, "Temp", tempC, "°C", CBat, Modifier.weight(1.2f))
                                 }
                             }
                         }
@@ -1361,7 +1432,7 @@ private fun EnergyFlow(data: SolarData?, modifier: Modifier = Modifier, onHistor
             // stanga ei, stalpul in dreapta. Coordonatele trebuie sa cada peste centrele
             // ilustratiilor de mai jos, altfel liniile pornesc de nicaieri.
             val sideInset = 58.dp.toPx()
-            val bottomRow = size.height - 53.dp.toPx()
+            val bottomRow = size.height - 60.dp.toPx()
             val solar = Offset(size.width / 2f, 29.dp.toPx())
             val house = Offset(size.width / 2f, bottomRow)
             val batteryNode = Offset(sideInset, bottomRow)
@@ -1415,7 +1486,7 @@ private fun EnergyFlow(data: SolarData?, modifier: Modifier = Modifier, onHistor
             // Capatul de sus trece pe langa poza SI pe langa valoarea de sub ea.
             connection(
                 solar, house, active = pv > DEAD, color = CPv,
-                startGap = 60.dp.toPx(), endGap = 36.dp.toPx()
+                startGap = 62.dp.toPx(), endGap = 34.dp.toPx()
             )
             connection(
                 batteryNode, house,
@@ -1491,9 +1562,16 @@ private fun FlowIllustration(
             modifier = Modifier.size(58.dp)
         )
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(value, color = color, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            Spacer(Modifier.width(2.dp))
-            Text("W", color = CMuted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 2.dp))
+            Text(
+                value,
+                color = color,
+                fontSize = 25.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                style = LocalTextStyle.current.copy(shadow = ValueShadow)
+            )
+            Spacer(Modifier.width(3.dp))
+            Text("W", color = CMuted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 3.dp))
         }
     }
 }
