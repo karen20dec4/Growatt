@@ -17,9 +17,11 @@ Docker Compose on a small server in the basement (IP `192.168.1.199`).
   each layer (collector → InfluxDB → `api/app.py` → `SolarRepository.kt` → Compose → WebP
   artwork), how to add a feature end to end, the Android release + Telegram delivery procedure,
   and the end-of-task checklist. **Read it before the first code change.**
-- **`GEMINI.md`** — same operating rules as this file, in Romanian, for Gemini CLI (which loads
-  `GEMINI.md` automatically the way Claude Code loads `CLAUDE.md`). If you change a rule, a
-  command, a port or a container here, change it there too — they are meant to stay in sync.
+- **`GEMINI.md`** — same operating rules as this file, in Romanian, for the Gemini agent. If you
+  change a rule, a command, a port or a container here, change it there too — they are meant to
+  stay in sync. Note: the Antigravity CLI (`agy`) does **not** auto-inject `GEMINI.md` in
+  `--print` mode (verified 2026-08-23), so any task prompt sent to it must tell it to read
+  `GEMINI.md` and `docs/DEZVOLTARE.md` first.
 
 ## ⚠️ The one hard invariant: READ-ONLY
 

@@ -27,7 +27,7 @@ Toate fișierele de documentație din repo, în ordinea în care le citești:
 
 | Fișier | Conținut |
 |---|---|
-| **`GEMINI.md`** | Punct de intrare pentru agentul AI care continuă proiectul (Gemini CLI îl citește automat): invariantul READ-ONLY, arhitectura, protocoalele, comenzile, regulile UI-ului Retro, capcanele. |
+| **`GEMINI.md`** | Punct de intrare pentru agentul Gemini care continuă proiectul: invariantul READ-ONLY, arhitectura, protocoalele, comenzile, regulile UI-ului Retro, capcanele. Trebuie citit **explicit** — `agy --print` nu îl injectează automat. |
 | **`CLAUDE.md`** | Echivalentul pentru Claude Code. Același conținut esențial; ține-le sincronizate când schimbi o regulă. |
 | **`docs/DEZVOLTARE.md`** | **Ghidul de dezvoltare.** Harta verticală a straturilor, cum adaugi o funcție cap-coadă, capcana etichetelor desenate în poze, procedura de release Android și livrarea pe Telegram, checklist de încheiere. |
 | **`COPILOT_CONTEXT.md`** | Jurnal de sesiuni și decizii (secțiunile `13.x`): istoricul descoperirii registrelor, fiecare release, incidente. Tabelul de registre are porțiuni **învechite** — `collector/collector.py` e sursa de adevăr. |

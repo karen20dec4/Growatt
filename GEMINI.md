@@ -1,8 +1,13 @@
 # GEMINI.md — punct de intrare pentru agentul care continuă proiectul
 
-> Fișier citit automat de Gemini CLI la pornire, echivalentul lui `CLAUDE.md`.
+> Echivalentul lui `CLAUDE.md`, pentru agentul Gemini.
 > **Citește-l întreg înainte de prima modificare.** Apoi `docs/DEZVOLTARE.md` pentru
 > procedura completă de adăugat funcții, build, release și livrare pe Telegram.
+>
+> ⚠️ **Nu presupune că acest fișier ți-a fost injectat automat.** Verificat pe 2026-08-23:
+> CLI-ul Antigravity (`agy`) în modul `--print` **nu** încarcă singur `GEMINI.md`. Dacă
+> nu-i vezi conținutul deja în context, deschide-l explicit cu un tool de citire, împreună
+> cu `docs/DEZVOLTARE.md`, **înainte** de a atinge orice fișier.
 
 ## Ce este proiectul
 
