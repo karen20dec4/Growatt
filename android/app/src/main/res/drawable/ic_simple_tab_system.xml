@@ -1,0 +1,19 @@
+<!-- Pictograma tabului SISTEM: un nod central legat de trei noduri satelit.
+     Culoarea vine din Compose prin `tint`, de aceea umplerea e alba aici. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:strokeColor="@android:color/white"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round"
+        android:pathData="M12,12 L6.2,7.2 M12,12 L17.8,7.2 M12,12 L12,18.4" />
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M12,9.3a2.7,2.7 0 1,0 0,5.4a2.7,2.7 0 1,0 0,-5.4z
+                          M6.2,3.6a2.4,2.4 0 1,0 0,4.8a2.4,2.4 0 1,0 0,-4.8z
+                          M17.8,3.6a2.4,2.4 0 1,0 0,4.8a2.4,2.4 0 1,0 0,-4.8z
+                          M12,16.4a2.4,2.4 0 1,0 0,4.8a2.4,2.4 0 1,0 0,-4.8z" />
+</vector>

@@ -30,6 +30,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -293,6 +299,68 @@ fun App() {
     }
 
     MaterialTheme(colorScheme = colors) {
+        val simpleEnergyContent: @Composable () -> Unit = {
+            Column(
+                Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                val metric = selectedHistory ?: historyMetric(selectedEnergyField)
+                HistoryMenuSheet(
+                    metrics = DashboardHistoryMetrics,
+                    retro = false,
+                    onMetricClick = { 
+                        selectedHistory = it
+                        selectedEnergyField = it.field 
+                    },
+                    compact = true
+                )
+                HistorySheet(
+                    metric = metric,
+                    retro = false,
+                    embedded = true,
+                    compact = false,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        
+        val simpleSystemContent: @Composable () -> Unit = {
+            Column(
+                Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SystemDetails(data = data, onHistoryClick = {
+                    selectedHistory = it
+                    selectedEnergyField = it.field
+                    retroTabName = RetroTab.ENERGY.name
+                })
+                SimpleServerMetrics(data = data)
+            }
+        }
+        
+        val simpleSettingsContent: @Composable () -> Unit = {
+            SettingsSheet(
+                dashboardStyle = dashboardStyle,
+                settings = alarmSettings,
+                ringtoneTitle = AlarmSettingsStore.ringtoneTitle(context, alarmSettings),
+                version = appVersion(context),
+                onDashboardStyleChange = ::changeDashboardStyle,
+                onEnabledChange = { enabled ->
+                    if (enabled && !hasNotificationPermission(context)) {
+                        enableAfterNotificationPermission = true
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        saveAlarmSettings(alarmSettings.copy(enabled = enabled))
+                    }
+                },
+                onThresholdChange = { saveAlarmSettings(alarmSettings.copy(thresholdW = it), applyService = false) },
+                onCooldownChange = { saveAlarmSettings(alarmSettings.copy(cooldownS = it), applyService = false) },
+                onVibrateChange = { saveAlarmSettings(alarmSettings.copy(vibrate = it), applyService = false) },
+                onPickRingtone = { ringtoneLauncher.launch(ringtonePickerIntent(alarmSettings)) },
+                onTestAlarm = { AlarmSettingsStore.testAlarm(context) }
+            )
+        }
+
         when (dashboardStyle) {
             DashboardStyle.RETRO -> RetroDashboard(
                 data = data,
@@ -310,96 +378,21 @@ fun App() {
                         onMetricSelected = { metric -> selectedEnergyField = metric.field }
                     )
                 },
-                settingsContent = {
-                    SettingsSheet(
-                        dashboardStyle = dashboardStyle,
-                        settings = alarmSettings,
-                        ringtoneTitle = AlarmSettingsStore.ringtoneTitle(context, alarmSettings),
-                        version = appVersion(context),
-                        onDashboardStyleChange = ::changeDashboardStyle,
-                        onEnabledChange = { enabled ->
-                            if (enabled && !hasNotificationPermission(context)) {
-                                enableAfterNotificationPermission = true
-                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            } else {
-                                saveAlarmSettings(alarmSettings.copy(enabled = enabled))
-                            }
-                        },
-                        onThresholdChange = { saveAlarmSettings(alarmSettings.copy(thresholdW = it), applyService = false) },
-                        onCooldownChange = { saveAlarmSettings(alarmSettings.copy(cooldownS = it), applyService = false) },
-                        onVibrateChange = { saveAlarmSettings(alarmSettings.copy(vibrate = it), applyService = false) },
-                        onPickRingtone = { ringtoneLauncher.launch(ringtonePickerIntent(alarmSettings)) },
-                        onTestAlarm = { AlarmSettingsStore.testAlarm(context) }
-                    )
-                }
+                settingsContent = simpleSettingsContent
             )
             DashboardStyle.SIMPLE -> SimpleDashboard(
                 data = data,
-                onHistoryClick = { showHistoryMenu = true },
-                onHistoryFieldClick = { selectedHistory = it },
-                onSettingsClick = { showSettings = true }
+                selectedTab = RetroTab.valueOf(retroTabName),
+                onTabSelected = { tab -> retroTabName = tab.name },
+                onHistoryFieldClick = { 
+                    selectedHistory = it
+                    selectedEnergyField = it.field
+                    retroTabName = RetroTab.ENERGY.name
+                },
+                energyContent = simpleEnergyContent,
+                systemContent = simpleSystemContent,
+                settingsContent = simpleSettingsContent
             )
-        }
-
-        if (!retro && showHistoryMenu) {
-            ModalBottomSheet(
-                onDismissRequest = { showHistoryMenu = false },
-                containerColor = chrome.panel,
-                contentColor = chrome.text,
-                dragHandle = { DashboardSheetHandle(retro) }
-            ) {
-                HistoryMenuSheet(
-                    metrics = DashboardHistoryMetrics,
-                    retro = retro,
-                    onMetricClick = { metric ->
-                        showHistoryMenu = false
-                        selectedHistory = metric
-                    }
-                )
-            }
-        }
-
-        if (!retro) {
-            selectedHistory?.let { metric ->
-                ModalBottomSheet(
-                    onDismissRequest = { selectedHistory = null },
-                    containerColor = chrome.panel,
-                    contentColor = chrome.text,
-                    dragHandle = { DashboardSheetHandle(retro) }
-                ) {
-                    HistorySheet(metric = metric, retro = retro)
-                }
-            }
-        }
-
-        if (!retro && showSettings) {
-            ModalBottomSheet(
-                onDismissRequest = { showSettings = false },
-                containerColor = chrome.panel,
-                contentColor = chrome.text,
-                dragHandle = { DashboardSheetHandle(retro) }
-            ) {
-                SettingsSheet(
-                    dashboardStyle = dashboardStyle,
-                    settings = alarmSettings,
-                    ringtoneTitle = AlarmSettingsStore.ringtoneTitle(context, alarmSettings),
-                    version = appVersion(context),
-                    onDashboardStyleChange = ::changeDashboardStyle,
-                    onEnabledChange = { enabled ->
-                        if (enabled && !hasNotificationPermission(context)) {
-                            enableAfterNotificationPermission = true
-                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            saveAlarmSettings(alarmSettings.copy(enabled = enabled))
-                        }
-                    },
-                    onThresholdChange = { saveAlarmSettings(alarmSettings.copy(thresholdW = it), applyService = false) },
-                    onCooldownChange = { saveAlarmSettings(alarmSettings.copy(cooldownS = it), applyService = false) },
-                    onVibrateChange = { saveAlarmSettings(alarmSettings.copy(vibrate = it), applyService = false) },
-                    onPickRingtone = { ringtoneLauncher.launch(ringtonePickerIntent(alarmSettings)) },
-                    onTestAlarm = { AlarmSettingsStore.testAlarm(context) }
-                )
-            }
         }
 
         if (alarmRinging) {
@@ -855,25 +848,68 @@ private fun RetroMetricButton(
 @Composable
 private fun SimpleDashboard(
     data: SolarData?,
-    onHistoryClick: () -> Unit,
+    selectedTab: RetroTab,
+    onTabSelected: (RetroTab) -> Unit,
     onHistoryFieldClick: (HistoryMetric) -> Unit,
-    onSettingsClick: () -> Unit
+    energyContent: @Composable () -> Unit,
+    systemContent: @Composable () -> Unit,
+    settingsContent: @Composable () -> Unit
 ) {
     Surface(Modifier.fillMaxSize(), color = CBg) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Header(
-                onHistoryClick = onHistoryClick,
-                onSettingsClick = onSettingsClick
+        Column(Modifier.fillMaxSize()) {
+            val swipeThreshold = with(LocalDensity.current) { 72.dp.toPx() }
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clipToBounds()
+                    .retroSwipeNavigation(
+                        selectedTab = selectedTab,
+                        threshold = swipeThreshold,
+                        onTabSelected = onTabSelected
+                    )
+            ) {
+                androidx.compose.animation.AnimatedContent(
+                    targetState = selectedTab,
+                    transitionSpec = {
+                        val forward = targetState.ordinal > initialState.ordinal
+                        val enterOffset: (Int) -> Int = { width -> if (forward) width else -width }
+                        val exitOffset: (Int) -> Int = { width -> if (forward) -width else width }
+                        (
+                            androidx.compose.animation.slideInHorizontally(
+                                animationSpec = tween(durationMillis = 240),
+                                initialOffsetX = enterOffset
+                            ) + androidx.compose.animation.fadeIn(animationSpec = tween(durationMillis = 180))
+                        ).togetherWith(
+                            androidx.compose.animation.slideOutHorizontally(
+                                animationSpec = tween(durationMillis = 240),
+                                targetOffsetX = exitOffset
+                            ) + androidx.compose.animation.fadeOut(animationSpec = tween(durationMillis = 180))
+                        )
+                    },
+                    label = "Navigare pagini Simple",
+                    modifier = Modifier.fillMaxSize()
+                ) { visibleTab ->
+                    when (visibleTab) {
+                        RetroTab.DASHBOARD -> {
+                            Column(
+                                Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Header()
+                                EnergyOverview(data = data, onHistoryClick = onHistoryFieldClick)
+                            }
+                        }
+                        RetroTab.ENERGY -> energyContent()
+                        RetroTab.SYSTEM -> systemContent()
+                        RetroTab.SETTINGS -> settingsContent()
+                    }
+                }
+            }
+            SimpleBottomNavigation(
+                selectedTab = selectedTab,
+                onTabSelected = onTabSelected
             )
-            EnergyOverview(data = data, onHistoryClick = onHistoryFieldClick)
-            SystemDetails(data = data, onHistoryClick = onHistoryFieldClick)
-            Spacer(Modifier.height(4.dp))
         }
     }
 }
@@ -922,84 +958,22 @@ private fun AlarmOverlay(message: String?, onStop: () -> Unit) {
 }
 
 @Composable
-private fun Header(onHistoryClick: () -> Unit, onSettingsClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                "Solar Monitor",
-                color = CText,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1
-            )
-            Text(
-                "Growatt SPF 6000 ES Plus",
-                color = CMuted,
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        HistoryHeaderButton(onClick = onHistoryClick)
-        HeaderIconButton(description = "Setari", onClick = onSettingsClick) {
-            SettingsGlyph(Modifier.size(18.dp), CMuted)
-        }
-    }
-}
-
-@Composable
-private fun HistoryHeaderButton(onClick: () -> Unit) {
-    Row(
-        Modifier
-            .height(40.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(CPanel)
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = "Deschide istoricul" }
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp)
-    ) {
-        TrendGlyph(Modifier.size(16.dp), CPv)
-        Text("Istoric", color = CText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun HeaderIconButton(
-    description: String,
-    onClick: () -> Unit,
-    icon: @Composable () -> Unit
-) {
-    Box(
-        Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(CPanel)
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center
-    ) {
-        icon()
-    }
-}
-
-@Composable
-private fun SettingsGlyph(modifier: Modifier, color: Color) {
-    Canvas(modifier) {
-        val stroke = 1.7.dp.toPx()
-        val knob = 2.4.dp.toPx()
-        val ys = listOf(size.height * 0.24f, size.height * 0.50f, size.height * 0.76f)
-        val xs = listOf(size.width * 0.67f, size.width * 0.34f, size.width * 0.60f)
-        ys.forEachIndexed { index, y ->
-            drawLine(color, Offset(0f, y), Offset(size.width, y), strokeWidth = stroke, cap = StrokeCap.Round)
-            drawCircle(CPanel, radius = knob + stroke, center = Offset(xs[index], y))
-            drawCircle(color, radius = knob, center = Offset(xs[index], y))
-        }
+private fun Header() {
+    Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        Text(
+            "Solar Monitor",
+            color = CText,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+        Text(
+            "Growatt SPF 6000 ES Plus",
+            color = CMuted,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -1379,55 +1353,82 @@ private fun TrendGlyph(modifier: Modifier, color: Color) {
 private fun HistoryMenuSheet(
     metrics: List<HistoryMetric>,
     retro: Boolean,
+    compact: Boolean = false,
     onMetricClick: (HistoryMetric) -> Unit
 ) {
     val chrome = dashboardChrome(retro)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = 18.dp, end = 18.dp, bottom = 28.dp)
-    ) {
-        Text(
-            if (retro) "ISTORIC" else "Istoric",
-            color = if (retro) RetroYellow else chrome.text,
-            fontFamily = chrome.font,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = if (retro) 1.sp else 0.sp
-        )
-        Text(
-            "Alege valoarea pe care vrei sa o analizezi.",
-            color = chrome.muted,
-            fontFamily = chrome.font,
-            fontSize = 12.sp
-        )
-        Spacer(Modifier.height(12.dp))
-        metrics.forEachIndexed { index, metric ->
-            val accent = historyAccent(metric.field, metric.color, retro)
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(if (retro) RetroPanelRaised.copy(alpha = 0.34f) else Color.Transparent)
-                    .clickable { onMetricClick(metric) }
-                    .padding(horizontal = 10.dp, vertical = 13.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(accent))
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
+    if (compact && !retro) {
+        androidx.compose.foundation.lazy.LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+        ) {
+            items(metrics.size) { index ->
+                val metric = metrics[index]
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(CPanel)
+                        .clickable { onMetricClick(metric) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
                     Text(
-                        if (retro) metric.title.uppercase(Locale.getDefault()) else metric.title,
+                        metric.title,
                         color = chrome.text,
                         fontFamily = chrome.font,
-                        fontSize = 14.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )
-                    Text(historySubtitle(metric), color = chrome.muted, fontFamily = chrome.font, fontSize = 10.sp)
                 }
-                TrendGlyph(Modifier.size(18.dp), accent)
             }
-            if (index < metrics.lastIndex) DetailDivider(retro)
+        }
+    } else {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 18.dp, end = 18.dp, bottom = 28.dp)
+        ) {
+            Text(
+                if (retro) "ISTORIC" else "Istoric",
+                color = if (retro) RetroYellow else chrome.text,
+                fontFamily = chrome.font,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = if (retro) 1.sp else 0.sp
+            )
+            Text(
+                "Alege valoarea pe care vrei sa o analizezi.",
+                color = chrome.muted,
+                fontFamily = chrome.font,
+                fontSize = 12.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            metrics.forEachIndexed { index, metric ->
+                val accent = historyAccent(metric.field, metric.color, retro)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (retro) RetroPanelRaised.copy(alpha = 0.34f) else Color.Transparent)
+                        .clickable { onMetricClick(metric) }
+                        .padding(horizontal = 10.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(accent))
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            if (retro) metric.title.uppercase(Locale.getDefault()) else metric.title,
+                            color = chrome.text,
+                            fontFamily = chrome.font,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(historySubtitle(metric), color = chrome.muted, fontFamily = chrome.font, fontSize = 10.sp)
+                    }
+                    TrendGlyph(Modifier.size(18.dp), accent)
+                }
+                if (index < metrics.lastIndex) DetailDivider(retro)
+            }
         }
     }
 }
@@ -1829,7 +1830,15 @@ private fun SettingSlider(
                     inactiveTickColor = RetroOlive
                 )
             } else {
-                SliderDefaults.colors()
+                // Implicit Material coloreaza pista inactiva cu `surfaceVariant`, ceea ce pe
+                // paleta Simple iese lavanda si nu se potriveste cu nimic. O legam de paleta.
+                SliderDefaults.colors(
+                    thumbColor = CHouse,
+                    activeTrackColor = CHouse,
+                    inactiveTrackColor = CLine,
+                    activeTickColor = CPanel,
+                    inactiveTickColor = CMuted
+                )
             }
         )
     }
@@ -2606,3 +2615,138 @@ private fun appVersion(context: Context): String =
     } catch (e: Exception) {
         "necunoscuta"
     }
+
+@Composable
+private fun SimpleBottomNavigation(
+    selectedTab: RetroTab,
+    onTabSelected: (RetroTab) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(72.dp),
+        color = CPanelRaised,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        shadowElevation = 8.dp
+    ) {
+        Row(
+            Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RetroTab.entries.forEach { tab ->
+                val selected = tab == selectedTab
+                val color = if (selected) CHouse else CMuted
+                val icon = when (tab) {
+                    RetroTab.DASHBOARD -> R.drawable.ic_simple_tab_dashboard
+                    RetroTab.ENERGY -> R.drawable.ic_simple_tab_energy
+                    RetroTab.SYSTEM -> R.drawable.ic_simple_tab_system
+                    RetroTab.SETTINGS -> R.drawable.ic_simple_tab_settings
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable { onTabSelected(tab) }
+                        .semantics {
+                            contentDescription = "${tab.label}${if (selected) ", selectat" else ""}"
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    androidx.compose.material3.Icon(
+                        painter = androidx.compose.ui.res.painterResource(icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = color
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = tab.label,
+                        color = color,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    if (selected) {
+                        Spacer(Modifier.height(3.dp))
+                        Box(
+                            Modifier
+                                .width(28.dp)
+                                .height(3.dp)
+                                .clip(RoundedCornerShape(1.5.dp))
+                                .background(CHouse)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SimpleServerMetrics(data: SolarData?) {
+    val uptime = data?.serverUptimeSeconds?.let {
+        val totalHours = (it / 3600).toInt()
+        val days = totalHours / 24
+        val hours = totalHours % 24
+        if (days > 0) "${days}z ${hours}h" else "${hours}h"
+    } ?: "—"
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = CPanel,
+        tonalElevation = 1.dp
+    ) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+            Text("Server", color = CText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SimpleMetricBox(
+                    modifier = Modifier.weight(1f),
+                    label = "CPU",
+                    value = data?.serverCpuPercent?.let { "${it.roundToInt()}%" } ?: "—",
+                    color = CPv
+                )
+                SimpleMetricBox(
+                    modifier = Modifier.weight(1f),
+                    label = "MEM",
+                    value = data?.serverMemoryPercent?.let { "${it.roundToInt()}%" } ?: "—",
+                    color = CBat
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SimpleMetricBox(
+                    modifier = Modifier.weight(1f),
+                    label = "UP",
+                    value = data?.serverUploadKbps?.let { String.format(Locale.US, "%.1f KB/s", it) } ?: "—",
+                    color = CHouse
+                )
+                SimpleMetricBox(
+                    modifier = Modifier.weight(1f),
+                    label = "UPTIME",
+                    value = uptime,
+                    color = CMuted
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SimpleMetricBox(
+    modifier: Modifier,
+    label: String,
+    value: String,
+    color: Color
+) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(CPanelSoft)
+            .padding(12.dp)
+    ) {
+        Text(label, color = CMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(4.dp))
+        Text(value, color = color, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}

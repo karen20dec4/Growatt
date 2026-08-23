@@ -323,7 +323,7 @@ internal fun RetroDashboard(
     }
 }
 
-private fun Modifier.retroSwipeNavigation(
+internal fun Modifier.retroSwipeNavigation(
     selectedTab: RetroTab,
     threshold: Float,
     onTabSelected: (RetroTab) -> Unit
