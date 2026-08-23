@@ -1237,3 +1237,65 @@ aplicația nouă ar primi „ISTORIC INDISPONIBIL" la `1d`.
 la declanșarea alarmei". Sunt pictate în bitmap, deci cer un export Photoshop nou.
 
 Sistemul rămâne strict **READ-ONLY** față de invertor.
+
+### 13.53 Redesign tema Simple + release v3.22 (2026-08-23)
+
+**Cerința.** Tema `Simple` „arăta nedefinit și avea aceleași culori ca Retro". Ținta: mai curată,
+mai luminoasă, altă paletă, senzație High-Tech, **pe fundal gri** (referința primită avea prea
+mult alb). Referință vizuală: `/opt/pics-logs-copilot/SIMPLE-new.png`.
+
+**Etapa 1 — paleta.** Toate culorile temei Simple stăteau în 11 constante, deci schimbarea a fost
+mică și a atins tot. Varianta aleasă de utilizator dintre trei propuse: gri-albastru rece —
+pagină `#DDE3EA`, card `#F5F8FB`, card evidențiat `#FFFFFF`, accent `#0B72E7`. Accentele au fost
+închise față de versiunea pe fond negru (verde `#1F9D55`, ambru `#C2790A`): pe gri deschis un ton
+luminos are contrast prea mic.
+
+Două capcane Material 3, ambele măsurate în captură, nu ghicite:
+- tema folosea `darkColorScheme` deși e luminoasă; `tonalElevation` amestecă `primary` în
+  suprafață, deci toate cardurile ieșeau spălate în verde;
+- `surfaceTint = Color.Transparent` **nu** rezolvă: fiind `0x00000000`, M3 îi aplică alfa-ul de
+  elevație și compune **negru** peste card. Măsurat `#E4E6E9` în loc de `#F5F8FB`. Corect e
+  `surfaceTint = chrome.panel`, ca amestecul să fie neutru.
+- bara de stare și cea de navigare urmează acum fundalul temei, cu `isAppearanceLight*`.
+
+**Etapa 2 — patru taburi fixe.** Simple era o pagină cu derulare plus trei `ModalBottomSheet`.
+Trece la structura Retro: același enum `RetroTab`, aceeași stare `retroTabName` (deci tabul
+supraviețuiește comutării de temă), bară de navigare proprie cu patru VectorDrawable.
+TABLOU / ENERGIE / SISTEM nu au niciun nod `scrollable`; SETĂRI se derulează deliberat.
+Pe ENERGIE singurul nod scrollabil e rândul **orizontal** de chipuri (996×127 px), nu o derulare
+verticală — verificat prin `uiautomator dump`.
+
+**Etapa 3 — cadranul și ilustrațiile.** `SimpleGauge` desenat integral cu Canvas: arc de 240°
+de la 150°, scală 0..7000 W etichetată în kW, ac triunghiular animat, zona ambru pornind de la
+pragul de alarmă din setări. Ilustrațiile 3D (panou, baterie, casă, stâlp) generate cu Gemini și
+prelucrate local.
+
+**De reținut despre `generate_image` al lui `agy`:** livrează **JPEG fără canal alfa**, chiar dacă
+fișierul are extensia `.png`. Cerut fundal transparent, a *desenat* tabla de șah ca pixeli reali.
+Eliminarea fundalului s-a făcut local, cu floodfill din puncte semănate pe **tot conturul** —
+fundalul generat e în degrade, iar floodfill compară cu culoarea seminței, deci un singur colț
+lasă o bandă opacă. Rezultat: WebP fără pierderi, cu alfa real, 33–54 KB fiecare.
+
+**Corecții de geometrie după inspecția capturilor** (niciuna prinsă de compilator):
+- raza cadranului era calculată din `minDimension`, deci se tăia pe lățime; arcul ocupă `2R` pe
+  lățime și `1.5R` pe înălțime, raza trebuie limitată de ambele;
+- valoarea centrală se suprapunea peste eticheta „0";
+- linia panou→casă avea decupajul mai lung decât distanța dintre noduri, deci nu se desena deloc;
+- pictograma SISTEM avea un contur de dreptunghi în plus și subcăi degenerate de lățime zero
+  (`M9 7v2H9V7z`), deci se randa ca un document cu pătrățele;
+- pista inactivă a slider-elor folosea `surfaceVariant` implicit Material și ieșea lavandă.
+
+**Flux de lucru.** A doua și a treia etapă executate de Gemini 3.1 Pro prin `agy`, pe branch-uri
+separate, pe bază de specificație scrisă în prealabil, cu verificare independentă în emulator.
+Notă operațională: `agy` trebuie lansat **în fundal** — o rulare a fost tăiată la 10 minute de
+limita de execuție a comenzilor, cu treaba aproape terminată.
+
+**Release.** `versionCode` 26, `versionName` 3.22, `SolarMonitor-v3.22.apk`, 7.217.932 bytes,
+SHA-256 `bd40a4cc68c245b0b0c2e161461f450a675a6dd51a85ccc46388f07354266d69`, livrat pe Telegram
+prin `@sun_tattva_access_bot`, mesaj **80**, SHA-256 descărcat înapoi identic.
+
+**Rămas de curățat.** `EnergyOverview`, `DailySummary` și `EnergyNode` nu mai sunt apelate după
+restructurare. Tema Retro nu a fost atinsă vizual; singura modificare acolo e
+`retroSwipeNavigation` trecut de la `private` la `internal`.
+
+Sistemul rămâne strict **READ-ONLY** față de invertor.
