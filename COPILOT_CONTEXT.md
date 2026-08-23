@@ -1362,3 +1362,41 @@ inclusiv o valoare de patru cifre în cadran (testat la 1670 W).
 **Release.** `versionCode` 28, `versionName` 3.24, `SolarMonitor-v3.24.apk`, 7.213.764 bytes,
 SHA-256 `329ff2b998f7cd65cbcaa80173ab46d50c9a2b2116754e92f215580d68bd3cba`, Telegram mesaj **82**,
 SHA-256 descărcat înapoi identic. Sistemul rămâne strict **READ-ONLY**.
+
+### 13.56 TABLOU adaptiv la înălțimea ecranului + release v3.25 (2026-08-24)
+
+**Bugul.** Pe telefonul real — Samsung Note 9, 1440×2960, densitate 560 — rândul de jos al paginii
+TABLOU era tăiat de bara de navigare: se vedeau doar etichetele BATERIE / INVERTOR / TEMP, nu și
+cifrele.
+
+**Cauza, și lecția.** Înălțimile erau fixe în `dp`, calibrate pe AVD-ul Pixel 6
+(1080×2400 @ 440 dpi = **393×873 dp**). Note 9 are 1440/3.5 × 2960/3.5 = **411×846 dp** — cu 27 dp
+mai puțin pe înălțime, plus o bară de stare mai înaltă. Marja dispăruse.
+
+> **Profilul implicit al emulatorului nu e reprezentativ pentru telefonul utilizatorului.** O
+> verificare făcută doar pe Pixel 6 poate trece în timp ce pe Note 9 ecranul e rupt. Comută
+> profilul cu `adb shell wm size 1440x2960` + `wm density 560` și verifică **ambele**; la final
+> `wm size reset` și `wm density reset`.
+
+**Rezolvarea** nu a fost ajustarea câtorva `dp`, ci layout adaptiv:
+
+- rândul de antet, rândul PV și rândul citirilor gravate rămân fixe — sunt bugetul minim și
+  trebuie să fie mereu complet vizibile;
+- cardul cu cadranul și cel cu diagrama împart restul prin `weight` (0,54 / 0,46), cu minime de
+  150 dp, respectiv 170 dp;
+- `EnergyFlow` scalează ilustrațiile între 44 și 58 dp după înălțimea primită și recalculează din
+  ea pozițiile nodurilor și decupajele liniilor, ca acestea să cadă în continuare peste centrele
+  imaginilor;
+- fontul valorii din cadran și raza etichetelor devin **proporționale cu raza cadranului**. Cu
+  font fix, pe cadranul mai mic de pe Note 9 cifrele ajungeau peste etichetele „0" și „7".
+
+Verificat pe ambele profile: toate cele patru taburi încap, cifrele gravate complet vizibile,
+niciun nod `scrollable` pe TABLOU și SISTEM (pe ENERGIE singurul e rândul orizontal de chipuri).
+
+**Flux de lucru.** Structura adaptivă executată de Gemini 3.1 Pro prin `agy`; a raportat criteriile
+ca îndeplinite, dar ratase suprapunerea valoare/etichete din cadran — prinsă la verificarea
+vizuală. Scalarea fontului și reechilibrarea greutăților, corectate manual.
+
+**Release.** `versionCode` 29, `versionName` 3.25, `SolarMonitor-v3.25.apk`, 7.213.764 bytes,
+SHA-256 `f0b01c5a4a07052fee881f8e880a060c599a11d896fedbba8ba1c7f62ad0e426`, Telegram mesaj **83**,
+SHA-256 descărcat înapoi identic. Sistemul rămâne strict **READ-ONLY**.
