@@ -243,6 +243,17 @@ Subcomenzi: `doctor`, `start`, `wait`, `build`, `install`, `launch`, `screenshot
 - Renderer headless stabil: **`swangle`**. Nu folosi `swiftshader_indirect` — pe gazda asta
   a omorât repetat emulatorul cu `SIGSEGV`.
 - Artefactele (PNG, ierarhie UI, logcat) merg în `android/build/emulator-artifacts/` (gitignored).
+- ⚠️ **AVD-ul implicit NU e telefonul utilizatorului.** Pixel 6 = 393×873 dp; telefonul real e un
+  **Samsung Note 9, 1440×2960 la densitate 560 = 411×846 dp**, adică 27 dp mai scurt. Un layout
+  care încape pe Pixel 6 poate fi tăiat pe telefon — s-a întâmplat deja (vezi
+  `COPILOT_CONTEXT.md` §13.56). Verifică **ambele** profile:
+  ```bash
+  ADB=/opt/android-sdk/platform-tools/adb
+  $ADB shell wm size 1440x2960 && $ADB shell wm density 560   # profilul Note 9
+  $ADB shell wm size reset     && $ADB shell wm density reset # inapoi la Pixel 6
+  ```
+  Readu întotdeauna profilul implicit la final. Și mai bine: fă layout-ul adaptiv (`weight`,
+  `BoxWithConstraints`) în loc să calibrezi înălțimi fixe pe un singur ecran.
 - **La finalul oricărei sarcini cu emulatorul rulează `stop`** și verifică oprirea. AVD-ul
   idle mănâncă mai multe nuclee CPU și ~5 GB RAM.
 
